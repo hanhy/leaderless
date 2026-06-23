@@ -18,6 +18,10 @@ AI_BASE_URL=https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/c
 AI_API_KEY=replace-with-your-key
 AI_MODEL=qwen3.6-plus
 API_PORT=8787
+AI_ENABLE_THINKING=false
+AI_CONTEXT_TURNS=6
+AI_SPEECH_MAX_TOKENS=150
+AI_CONCLUSION_MAX_TOKENS=220
 ```
 
 启动：

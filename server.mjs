@@ -17,6 +17,18 @@ function loadEnvFile() {
 loadEnvFile();
 
 const port = Number(process.env.API_PORT ?? 8787);
+const contextTurns = Number(process.env.AI_CONTEXT_TURNS ?? 6);
+const speechMaxTokens = Number(process.env.AI_SPEECH_MAX_TOKENS ?? 150);
+const conclusionMaxTokens = Number(process.env.AI_CONCLUSION_MAX_TOKENS ?? 220);
+
+function parseBoolean(value, fallback) {
+  if (value === undefined) return fallback;
+  return ["1", "true", "yes", "on"].includes(String(value).toLowerCase());
+}
+
+function clip(text = "", limit = 140) {
+  return text.length > limit ? `${text.slice(0, limit)}...` : text;
+}
 
 function readJson(req) {
   return new Promise((resolve, reject) => {
@@ -42,74 +54,57 @@ function readJson(req) {
 
 function recentTranscript(transcript = []) {
   return transcript
-    .slice(-14)
+    .slice(-contextTurns)
     .map((entry) => {
       const who = entry.speakerName ?? (entry.type === "user" ? "主持人" : "系统");
-      return `${who}（${entry.type}）：${entry.text}`;
+      return `${who}：${clip(entry.text, 120)}`;
     })
     .join("\n");
 }
 
 function styleInstruction(style) {
   const styles = {
-    稳健陈述: "语气稳健，先承接再给判断，避免抢结论。",
-    主动打断: "可以直接指出问题，但必须先点名承接对方刚才的观点。",
-    强势推进: "目标导向，压缩分歧，推动形成可执行结论。",
-    温和接续: "先肯定已有观点，再补充遗漏，语气温和。",
-    结构化总结: "善于归纳，用条理清楚的方式推进阶段结论。"
+    稳健陈述: "稳健，先承接再判断。",
+    主动打断: "可直接指出问题，但先承接对方。",
+    强势推进: "目标导向，推动落结论。",
+    温和接续: "先肯定，再补遗漏。",
+    结构化总结: "归纳清楚，推进阶段结论。"
   };
-  return styles[style] ?? "表达清晰，围绕当前议题推进。";
+  return styles[style] ?? "表达清晰，围绕议题推进。";
 }
 
 function buildMessages(payload) {
-  const { person, people, snapshot, turnType, interruption, partialText } = payload;
+  const { person, snapshot, turnType, interruption, partialText } = payload;
   const phaseName = {
     opening: "开场陈述",
     exploring: "探索信息",
     debating: "交锋讨论",
     concluding: "收束结论"
   }[snapshot.phase] ?? snapshot.phase;
-  const roster = people
-    .map(
-      (item) =>
-        `${item.name}：${item.gender}，性格特质=${item.traits.join("、")}，发言风格=${item.speechStyle}，打断倾向=${item.interruptiveness}，坚持表达=${item.persistence}`
-    )
-    .join("\n");
   const task =
     turnType === "conclusion"
-      ? "请作为小组代表宣读阶段结论。结论要包含共识、主要分歧、下一步行动，不要超过180字。"
+      ? "代表小组宣读阶段结论：共识、分歧、下一步。120字内。"
       : turnType === "interrupt"
-        ? "你正在打断别人。必须先接住对方已经说出的观点，再选择补充、修正或反驳，不能跳到无关内容。目标是把讨论推向阶段结论，不要超过130字。"
-        : "请自然发言。必须回应上一位观点或当前议题，推进共识，不要超过130字。";
+        ? "你在打断：先接住对方已说内容，再补充/修正/反驳，推动结论。90字内。"
+        : "自然发言：回应上一位或当前议题，推进共识。90字内。";
 
   return [
     {
       role: "system",
-      content:
-        "你是一个无领导小组讨论模拟器中的参会者。只输出角色要说的话本身，不要输出角色名、括号说明、Markdown、JSON、旁白或舞台指令。语言为中文，内容要紧扣上下文，主要目标是达成阶段结论。"
+      content: "中文无领导小组角色。只输出发言本身，无角色名/Markdown/旁白。紧扣上下文，目标是阶段结论。"
     },
     {
       role: "user",
       content: [
-        `当前议题：${snapshot.topic}`,
-        `本轮问题/追问：${snapshot.question}`,
-        `讨论阶段：${phaseName}`,
-        `当前轮次：${snapshot.round}`,
-        "",
-        "参会者设定：",
-        roster,
-        "",
-        `你是：${person.name}`,
-        `你的性格特质：${person.traits.join("、")}`,
-        `你的发言风格：${person.speechStyle}。${styleInstruction(person.speechStyle)}`,
-        "",
-        "最近讨论记录：",
+        `题：${clip(snapshot.topic, 90)}`,
+        `问：${clip(snapshot.question, 90)}`,
+        `阶段：${phaseName}，轮次：${snapshot.round}`,
+        `你：${person.name}，${person.gender}，${person.traits.join("、")}，${person.speechStyle}。${styleInstruction(person.speechStyle)}`,
+        "近况：",
         recentTranscript(snapshot.transcript) || "暂无。",
-        "",
         interruption
-          ? `你要打断的对象：${interruption.speakerName}\n对方已经说到：${partialText || "尚未形成完整句子"}\n打断原因：${interruption.reason}`
+          ? `打断${interruption.speakerName}，其已说：${clip(partialText || "尚未形成完整句子", 120)}；原因：${interruption.reason}`
           : "",
-        "",
         `任务：${task}`
       ].join("\n")
     }
@@ -128,6 +123,8 @@ async function streamAi(req, res) {
   const baseUrl = process.env.AI_BASE_URL;
   const apiKey = process.env.AI_API_KEY;
   const model = process.env.AI_MODEL ?? "qwen3.6-plus";
+  const enableThinking = parseBoolean(process.env.AI_ENABLE_THINKING, false);
+  const thinkingBudget = process.env.AI_THINKING_BUDGET ? Number(process.env.AI_THINKING_BUDGET) : undefined;
 
   if (!baseUrl || !apiKey) {
     writeText(res, 500, "缺少 AI_BASE_URL 或 AI_API_KEY 环境变量。");
@@ -135,19 +132,33 @@ async function streamAi(req, res) {
   }
 
   const payload = await readJson(req);
+  const messages = buildMessages(payload);
+  const startedAt = Date.now();
+  let firstTokenAt = 0;
+  const requestBody = {
+    model,
+    messages,
+    stream: true,
+    temperature: payload.turnType === "conclusion" ? 0.35 : 0.62,
+    max_tokens: payload.turnType === "conclusion" ? conclusionMaxTokens : speechMaxTokens,
+    enable_thinking: enableThinking
+  };
+
+  if (thinkingBudget !== undefined) {
+    requestBody.thinking_budget = thinkingBudget;
+  }
+
+  console.log(
+    `[ai] start type=${payload.turnType} role=${payload.person?.name ?? "-"} prompt_chars=${messages.map((item) => item.content.length).reduce((sum, size) => sum + size, 0)} thinking=${enableThinking}`
+  );
+
   const upstream = await fetch(baseUrl, {
     method: "POST",
     headers: {
       authorization: `Bearer ${apiKey}`,
       "content-type": "application/json"
     },
-    body: JSON.stringify({
-      model,
-      messages: buildMessages(payload),
-      stream: true,
-      temperature: payload.turnType === "conclusion" ? 0.45 : 0.72,
-      max_tokens: payload.turnType === "conclusion" ? 360 : 260
-    })
+    body: JSON.stringify(requestBody)
   });
 
   if (!upstream.ok || !upstream.body) {
@@ -177,7 +188,13 @@ async function streamAi(req, res) {
       try {
         const json = JSON.parse(data);
         const text = json.choices?.[0]?.delta?.content ?? json.choices?.[0]?.message?.content ?? "";
-        if (text) res.write(text);
+        if (text) {
+          if (!firstTokenAt) {
+            firstTokenAt = Date.now();
+            console.log(`[ai] first_token_ms=${firstTokenAt - startedAt}`);
+          }
+          res.write(text);
+        }
       } catch {
         // Ignore keep-alive or vendor-specific stream lines.
       }
@@ -185,6 +202,7 @@ async function streamAi(req, res) {
   }
 
   res.end();
+  console.log(`[ai] done total_ms=${Date.now() - startedAt}`);
 }
 
 createServer(async (req, res) => {
