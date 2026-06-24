@@ -55,22 +55,22 @@ const roleSpeakerFallbacks = {
   "刘备": "zh_male_wennuanahu_uranus_bigtts",
   "曹操": "zh_male_aojiaobazong_uranus_bigtts",
   "关羽": "zh_male_gaolengchenwen_uranus_bigtts",
-  "唐僧": "zh_male_ruyaqingnian_uranus_bigtts",
-  "孙悟空": "zh_male_qingcang_uranus_bigtts",
-  "猪八戒": "zh_male_wennuanahu_uranus_bigtts",
-  "沙僧": "zh_male_gaolengchenwen_uranus_bigtts"
+  "唐僧": "zh_male_tangseng_uranus_bigtts",
+  "孙悟空": "zh_male_sunwukong_uranus_bigtts",
+  "猪八戒": "zh_male_zhubajie_uranus_bigtts",
+  "沙僧": "ICL_uranus_zh_male_younidashu_tob"
 };
 
 const roleAudioParams = {
-  "诸葛亮": { speech_rate: -4, loudness_rate: 0 },
-  "张飞": { speech_rate: 18, loudness_rate: 18, emotion: "angry", emotion_scale: 3 },
-  "刘备": { speech_rate: -2, loudness_rate: 0 },
-  "曹操": { speech_rate: 8, loudness_rate: 10 },
-  "关羽": { speech_rate: -12, loudness_rate: 6 },
-  "唐僧": { speech_rate: -8, loudness_rate: 0 },
-  "孙悟空": { speech_rate: 16, loudness_rate: 10 },
-  "猪八戒": { speech_rate: 6, loudness_rate: 8 },
-  "沙僧": { speech_rate: -10, loudness_rate: 4 }
+  "诸葛亮": { speech_rate: 8, loudness_rate: 5, emotion: "storytelling", emotion_scale: 3 },
+  "张飞": { speech_rate: 28, loudness_rate: 22, emotion: "angry", emotion_scale: 4 },
+  "刘备": { speech_rate: 10, loudness_rate: 6, emotion: "tender", emotion_scale: 3 },
+  "曹操": { speech_rate: 18, loudness_rate: 14, emotion: "magnetic", emotion_scale: 3 },
+  "关羽": { speech_rate: 4, loudness_rate: 10, emotion: "neutral", emotion_scale: 3 },
+  "唐僧": { speech_rate: 8, loudness_rate: 6, emotion: "tender", emotion_scale: 3 },
+  "孙悟空": { speech_rate: 28, loudness_rate: 16, emotion: "excited", emotion_scale: 4 },
+  "猪八戒": { speech_rate: 18, loudness_rate: 12, emotion: "happy", emotion_scale: 4 },
+  "沙僧": { speech_rate: 6, loudness_rate: 8, emotion: "storytelling", emotion_scale: 2 }
 };
 
 const mimeTypes = {
