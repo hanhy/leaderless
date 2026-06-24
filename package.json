@@ -10,7 +10,11 @@
     "preview": "vite preview --host 127.0.0.1"
   },
   "devDependencies": {
+    "@types/ws": "^8.18.1",
     "typescript": "^5.5.4",
     "vite": "^5.4.0"
+  },
+  "dependencies": {
+    "ws": "^8.21.0"
   }
 }

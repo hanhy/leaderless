@@ -251,7 +251,7 @@ input[type="range"] {
 
 .action-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -271,6 +271,12 @@ input[type="range"] {
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.065);
   color: #e9edf6;
+}
+
+.voice-button.is-on {
+  border-color: rgba(123, 216, 143, 0.42);
+  background: rgba(123, 216, 143, 0.16);
+  color: #baf3c8;
 }
 
 .stage {

@@ -1,7 +1,9 @@
 import { createServer } from "node:http";
+import { randomUUID } from "node:crypto";
 import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import WebSocket, { WebSocketServer } from "ws";
 
 function loadEnvFile() {
   if (!existsSync(".env")) return;
@@ -25,6 +27,43 @@ const host = process.env.HOST ?? "127.0.0.1";
 const contextTurns = Number(process.env.AI_CONTEXT_TURNS ?? 6);
 const speechMaxTokens = Number(process.env.AI_SPEECH_MAX_TOKENS ?? 150);
 const conclusionMaxTokens = Number(process.env.AI_CONCLUSION_MAX_TOKENS ?? 220);
+const volcTtsUrl = process.env.VOLC_TTS_URL ?? "wss://openspeech.bytedance.com/api/v3/tts/bidirection";
+const volcTtsResourceId = process.env.VOLC_TTS_RESOURCE_ID ?? "seed-tts-2.0";
+const volcTtsFormat = process.env.VOLC_TTS_FORMAT ?? "pcm";
+const volcTtsSampleRate = Number(process.env.VOLC_TTS_SAMPLE_RATE ?? 24000);
+
+const ttsEvents = {
+  startConnection: 1,
+  finishConnection: 2,
+  connectionStarted: 50,
+  connectionFailed: 51,
+  connectionFinished: 52,
+  startSession: 100,
+  cancelSession: 101,
+  finishSession: 102,
+  sessionStarted: 150,
+  sessionCanceled: 151,
+  sessionFinished: 152,
+  sessionFailed: 153,
+  taskRequest: 200,
+  ttsResponse: 352
+};
+
+const roleSpeakerFallbacks = {
+  "诸葛亮": "zh_male_ruyaqingnian_uranus_bigtts",
+  "张飞": "zh_male_qingcang_uranus_bigtts",
+  "刘备": "zh_male_wennuanahu_uranus_bigtts",
+  "曹操": "zh_male_aojiaobazong_uranus_bigtts",
+  "关羽": "zh_male_gaolengchenwen_uranus_bigtts"
+};
+
+const roleAudioParams = {
+  "诸葛亮": { speech_rate: -4, loudness_rate: 0 },
+  "张飞": { speech_rate: 18, loudness_rate: 18, emotion: "angry", emotion_scale: 3 },
+  "刘备": { speech_rate: -2, loudness_rate: 0 },
+  "曹操": { speech_rate: 8, loudness_rate: 10 },
+  "关羽": { speech_rate: -12, loudness_rate: 6 }
+};
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -96,6 +135,23 @@ function roleName(name = "") {
     if (name.includes(role)) return role;
   }
   return name;
+}
+
+function speakerEnvKey(role) {
+  const keys = {
+    "诸葛亮": "VOLC_TTS_SPEAKER_ZHUGE_LIANG",
+    "张飞": "VOLC_TTS_SPEAKER_ZHANG_FEI",
+    "刘备": "VOLC_TTS_SPEAKER_LIU_BEI",
+    "曹操": "VOLC_TTS_SPEAKER_CAO_CAO",
+    "关羽": "VOLC_TTS_SPEAKER_GUAN_YU"
+  };
+  return keys[role];
+}
+
+function speakerForName(name = "") {
+  const role = roleName(name);
+  const envKey = speakerEnvKey(role);
+  return (envKey && process.env[envKey]) || process.env.VOLC_TTS_DEFAULT_SPEAKER || roleSpeakerFallbacks[role] || roleSpeakerFallbacks["诸葛亮"];
 }
 
 function addressInstruction(person) {
@@ -281,7 +337,294 @@ async function streamAi(req, res) {
   console.log(`[ai] done total_ms=${Date.now() - startedAt}`);
 }
 
-createServer(async (req, res) => {
+function jsonBytes(value) {
+  return Buffer.from(JSON.stringify(value), "utf8");
+}
+
+function frameJson(event, payload = {}, sessionId = "") {
+  const payloadBytes = jsonBytes(payload);
+  const sessionBytes = sessionId ? Buffer.from(sessionId, "utf8") : undefined;
+  const headerLength = sessionBytes ? 12 + sessionBytes.length + 4 : 12;
+  const frame = Buffer.alloc(headerLength + payloadBytes.length);
+
+  frame[0] = 0x11;
+  frame[1] = 0x14;
+  frame[2] = 0x10;
+  frame[3] = 0x00;
+  frame.writeInt32BE(event, 4);
+
+  if (sessionBytes) {
+    frame.writeUInt32BE(sessionBytes.length, 8);
+    sessionBytes.copy(frame, 12);
+    frame.writeUInt32BE(payloadBytes.length, 12 + sessionBytes.length);
+    payloadBytes.copy(frame, 16 + sessionBytes.length);
+  } else {
+    frame.writeUInt32BE(payloadBytes.length, 8);
+    payloadBytes.copy(frame, 12);
+  }
+
+  return frame;
+}
+
+function parseVolcFrame(data) {
+  const frame = Buffer.isBuffer(data) ? data : Buffer.from(data);
+  if (frame.length < 4) return { messageType: -1, payload: Buffer.alloc(0) };
+
+  const headerSize = (frame[0] & 0x0f) * 4;
+  const messageType = frame[1] >> 4;
+  const flags = frame[1] & 0x0f;
+  const serialization = frame[2] >> 4;
+  let offset = headerSize;
+  let event;
+  let code;
+
+  if ((flags & 0x04) === 0x04 && frame.length >= offset + 4) {
+    event = frame.readInt32BE(offset);
+    offset += 4;
+  }
+
+  if (messageType === 0x0f) {
+    if (frame.length >= offset + 4) {
+      code = frame.readInt32BE(offset);
+      offset += 4;
+    }
+    const payload = frame.subarray(offset);
+    return { messageType, event, code, payload, json: parseMaybeJson(payload) };
+  }
+
+  let id = "";
+  if (frame.length >= offset + 4) {
+    const idLength = frame.readUInt32BE(offset);
+    offset += 4;
+    if (idLength > 0 && frame.length >= offset + idLength) {
+      id = frame.subarray(offset, offset + idLength).toString("utf8");
+      offset += idLength;
+    }
+  }
+
+  let payload = Buffer.alloc(0);
+  if (frame.length >= offset + 4) {
+    const payloadLength = frame.readUInt32BE(offset);
+    offset += 4;
+    if (payloadLength > 0 && frame.length >= offset + payloadLength) {
+      payload = frame.subarray(offset, offset + payloadLength);
+    }
+  }
+
+  return {
+    messageType,
+    event,
+    code,
+    id,
+    payload,
+    json: serialization === 1 ? parseMaybeJson(payload) : undefined
+  };
+}
+
+function parseMaybeJson(payload) {
+  if (!payload?.length) return undefined;
+  try {
+    return JSON.parse(payload.toString("utf8"));
+  } catch {
+    return undefined;
+  }
+}
+
+function ttsSessionMeta(speakerName) {
+  const role = roleName(speakerName);
+  return {
+    user: {
+      uid: `leaderless-${role || "speaker"}`
+    },
+    event: ttsEvents.startSession,
+    namespace: "BidirectionalTTS",
+    req_params: {
+      text: "",
+      speaker: speakerForName(speakerName),
+      audio_params: {
+        format: volcTtsFormat,
+        sample_rate: volcTtsSampleRate,
+        ...(roleAudioParams[role] ?? {})
+      }
+    }
+  };
+}
+
+function ttsTextPayload(text) {
+  return {
+    event: ttsEvents.taskRequest,
+    namespace: "BidirectionalTTS",
+    req_params: {
+      text
+    }
+  };
+}
+
+function sendClientJson(client, payload) {
+  if (client.readyState === WebSocket.OPEN) {
+    client.send(JSON.stringify(payload));
+  }
+}
+
+function setupTtsClient(client) {
+  const apiKey = process.env.VOLC_TTS_API_KEY;
+  if (!apiKey) {
+    sendClientJson(client, { type: "error", message: "缺少 VOLC_TTS_API_KEY 环境变量。" });
+    client.close();
+    return;
+  }
+
+  let upstream;
+  let sessionId = "";
+  let speakerName = "";
+  let sessionReady = false;
+  let shouldFinish = false;
+  let hasFinished = false;
+  const pendingText = [];
+
+  function flushText() {
+    if (!upstream || upstream.readyState !== WebSocket.OPEN || !sessionReady) return;
+    while (pendingText.length > 0) {
+      const text = pendingText.shift();
+      if (text) upstream.send(frameJson(ttsEvents.taskRequest, ttsTextPayload(text), sessionId));
+    }
+    if (shouldFinish && !hasFinished) {
+      hasFinished = true;
+      upstream.send(frameJson(ttsEvents.finishSession, {}, sessionId));
+    }
+  }
+
+  function closeUpstream() {
+    if (!upstream || upstream.readyState !== WebSocket.OPEN) return;
+    try {
+      if (!hasFinished && sessionReady) {
+        upstream.send(frameJson(ttsEvents.cancelSession, {}, sessionId));
+      }
+      upstream.send(frameJson(ttsEvents.finishConnection, {}));
+    } catch {
+      // Best-effort cleanup.
+    }
+    upstream.close();
+  }
+
+  function connectVolc() {
+    sessionId = randomUUID().replaceAll("-", "").slice(0, 24);
+    upstream = new WebSocket(volcTtsUrl, {
+      headers: {
+        "X-Api-Key": apiKey,
+        "X-Api-Resource-Id": volcTtsResourceId,
+        "X-Api-Connect-Id": randomUUID(),
+        "X-Control-Require-Usage-Tokens-Return": "text_words"
+      }
+    });
+
+    upstream.on("open", () => {
+      upstream.send(frameJson(ttsEvents.startConnection, {}));
+    });
+
+    upstream.on("message", (data) => {
+      const frame = parseVolcFrame(data);
+
+      if (frame.messageType === 0x0f) {
+        sendClientJson(client, {
+          type: "error",
+          message: frame.json?.message ?? frame.payload.toString("utf8") ?? "火山语音服务返回错误。"
+        });
+        return;
+      }
+
+      if (frame.event === ttsEvents.connectionStarted) {
+        upstream.send(frameJson(ttsEvents.startSession, ttsSessionMeta(speakerName), sessionId));
+        return;
+      }
+
+      if (frame.event === ttsEvents.sessionStarted) {
+        sessionReady = true;
+        sendClientJson(client, {
+          type: "ready",
+          format: volcTtsFormat,
+          sampleRate: volcTtsSampleRate
+        });
+        flushText();
+        return;
+      }
+
+      if (frame.event === ttsEvents.ttsResponse && frame.payload.length > 0) {
+        if (client.readyState === WebSocket.OPEN) client.send(frame.payload);
+        return;
+      }
+
+      if (frame.event === ttsEvents.sessionFinished || frame.event === ttsEvents.sessionCanceled) {
+        sendClientJson(client, { type: "done", usage: frame.json?.usage });
+        closeUpstream();
+        windowSafeClose(client);
+        return;
+      }
+
+      if (frame.event === ttsEvents.connectionFailed || frame.event === ttsEvents.sessionFailed) {
+        sendClientJson(client, {
+          type: "error",
+          message: frame.json?.message ?? "火山语音连接或会话失败。"
+        });
+      }
+    });
+
+    upstream.on("error", (error) => {
+      sendClientJson(client, { type: "error", message: error.message || "火山语音 WebSocket 异常。" });
+    });
+
+    upstream.on("close", () => {
+      sendClientJson(client, { type: "closed" });
+    });
+  }
+
+  client.on("message", (raw) => {
+    let message;
+    try {
+      message = JSON.parse(raw.toString("utf8"));
+    } catch {
+      sendClientJson(client, { type: "error", message: "TTS 客户端消息格式错误。" });
+      return;
+    }
+
+    if (message.type === "start") {
+      speakerName = String(message.speakerName ?? "");
+      connectVolc();
+      return;
+    }
+
+    if (message.type === "text") {
+      const text = String(message.text ?? "");
+      if (text.trim()) {
+        pendingText.push(text);
+        flushText();
+      }
+      return;
+    }
+
+    if (message.type === "finish") {
+      shouldFinish = true;
+      flushText();
+      return;
+    }
+
+    if (message.type === "cancel") {
+      shouldFinish = true;
+      closeUpstream();
+      windowSafeClose(client);
+    }
+  });
+
+  client.on("close", closeUpstream);
+}
+
+function windowSafeClose(socket) {
+  if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+    socket.close();
+  }
+}
+
+const httpServer = createServer(async (req, res) => {
   res.setHeader("access-control-allow-origin", "*");
   res.setHeader("access-control-allow-methods", "POST, OPTIONS");
   res.setHeader("access-control-allow-headers", "content-type");
@@ -302,6 +645,23 @@ createServer(async (req, res) => {
   }
 
   serveStatic(req, res);
-}).listen(port, host, () => {
+});
+
+const ttsWss = new WebSocketServer({ noServer: true });
+ttsWss.on("connection", setupTtsClient);
+
+httpServer.on("upgrade", (req, socket, head) => {
+  const pathname = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`).pathname;
+  if (pathname !== "/api/tts/stream") {
+    socket.destroy();
+    return;
+  }
+
+  ttsWss.handleUpgrade(req, socket, head, (client) => {
+    ttsWss.emit("connection", client, req);
+  });
+});
+
+httpServer.listen(port, host, () => {
   console.log(`Leaderless server listening on http://${host}:${port}`);
 });

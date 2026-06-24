@@ -85,6 +85,7 @@ let isRunning = false;
 let sessionEnded = false;
 let lastConclusion = "";
 let typewriterSequence: Promise<boolean> = Promise.resolve(false);
+let voiceEnabled = true;
 
 const app = document.querySelector<HTMLDivElement>("#app");
 
@@ -120,6 +121,7 @@ app.innerHTML = `
         <div class="action-row">
           <button id="startButton" class="primary-button" type="button">开始讨论</button>
           <button id="endButton" class="ghost-button" type="button" disabled>结束并总结</button>
+          <button id="voiceButton" class="ghost-button voice-button is-on" type="button">语音开启</button>
         </div>
       </section>
     </section>
@@ -155,6 +157,7 @@ const transcriptList = document.querySelector<HTMLDivElement>("#transcriptList")
 const questionInput = document.querySelector<HTMLTextAreaElement>("#questionInput")!;
 const startButton = document.querySelector<HTMLButtonElement>("#startButton")!;
 const endButton = document.querySelector<HTMLButtonElement>("#endButton")!;
+const voiceButton = document.querySelector<HTMLButtonElement>("#voiceButton")!;
 const activeSpeech = document.querySelector<HTMLDivElement>("#activeSpeech")!;
 const activeSpeaker = document.querySelector<HTMLSpanElement>("#activeSpeaker")!;
 const sessionState = document.querySelector<HTMLSpanElement>("#sessionState")!;
@@ -178,6 +181,151 @@ function escapeHtml(value: string): string {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 }
+
+class PcmSpeechPlayer {
+  private context?: AudioContext;
+  private socket?: WebSocket;
+  private pendingText: string[] = [];
+  private sources = new Set<AudioBufferSourceNode>();
+  private donePromise?: Promise<void>;
+  private resolveDone?: () => void;
+  private finishRequested = false;
+  private nextStartTime = 0;
+  private sampleRate = 24000;
+
+  async start(speaker: PersonConfig): Promise<void> {
+    if (!voiceEnabled) return;
+    this.stop();
+    this.pendingText = [];
+    this.finishRequested = false;
+    this.donePromise = new Promise((resolve) => {
+      this.resolveDone = resolve;
+    });
+    this.context = this.context ?? new AudioContext();
+    if (this.context.state === "suspended") {
+      await this.context.resume();
+    }
+    this.nextStartTime = this.context.currentTime + 0.04;
+
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    this.socket = new WebSocket(`${protocol}//${window.location.host}/api/tts/stream`);
+    this.socket.binaryType = "arraybuffer";
+    this.socket.addEventListener("open", () => {
+      this.socket?.send(JSON.stringify({ type: "start", speakerName: speaker.name }));
+      this.flushText();
+      this.flushFinish();
+    });
+    this.socket.addEventListener("message", (event) => {
+      if (typeof event.data === "string") {
+        this.handleControlMessage(event.data);
+        return;
+      }
+      this.playPcm(event.data);
+    });
+    this.socket.addEventListener("error", () => {
+      this.stop();
+    });
+    this.socket.addEventListener("close", () => {
+      this.resolveDone?.();
+    });
+  }
+
+  send(text: string): void {
+    if (!voiceEnabled || !text.trim()) return;
+    this.pendingText.push(text);
+    this.flushText();
+  }
+
+  async finishAndWait(): Promise<void> {
+    if (!voiceEnabled || !this.socket) return;
+    this.finishRequested = true;
+    this.flushFinish();
+    await Promise.race([this.donePromise, sleep(8000)]);
+    const remainingMs = this.context ? Math.max(0, (this.nextStartTime - this.context.currentTime) * 1000) : 0;
+    if (remainingMs > 0) {
+      await sleep(Math.min(remainingMs + 80, 5000));
+    }
+  }
+
+  stop(): void {
+    if (this.socket?.readyState === WebSocket.OPEN) {
+      this.socket.send(JSON.stringify({ type: "cancel" }));
+    }
+    this.socket?.close();
+    this.socket = undefined;
+    this.pendingText = [];
+    this.finishRequested = false;
+    this.sources.forEach((source) => {
+      try {
+        source.stop();
+      } catch {
+        // Source may already be stopped.
+      }
+    });
+    this.sources.clear();
+    this.resolveDone?.();
+    this.donePromise = undefined;
+    this.resolveDone = undefined;
+    this.nextStartTime = this.context?.currentTime ?? 0;
+  }
+
+  private flushText(): void {
+    if (this.socket?.readyState !== WebSocket.OPEN) return;
+    while (this.pendingText.length > 0) {
+      const text = this.pendingText.shift();
+      if (text) this.socket.send(JSON.stringify({ type: "text", text }));
+    }
+  }
+
+  private flushFinish(): void {
+    if (!this.finishRequested || this.socket?.readyState !== WebSocket.OPEN) return;
+    this.socket.send(JSON.stringify({ type: "finish" }));
+    this.finishRequested = false;
+  }
+
+  private handleControlMessage(raw: string): void {
+    try {
+      const message = JSON.parse(raw) as { type?: string; sampleRate?: number; message?: string };
+      if (message.type === "ready" && message.sampleRate) {
+        this.sampleRate = message.sampleRate;
+      }
+      if (message.type === "error") {
+        console.warn(`[tts] ${message.message ?? "语音合成失败"}`);
+      }
+      if (message.type === "done" || message.type === "closed") {
+        this.resolveDone?.();
+      }
+    } catch {
+      // Ignore non-JSON control frames.
+    }
+  }
+
+  private playPcm(data: ArrayBuffer): void {
+    if (!this.context || data.byteLength < 2) return;
+    const bytes = data.byteLength % 2 === 0 ? data : data.slice(0, data.byteLength - 1);
+    const pcm = new Int16Array(bytes);
+    if (pcm.length === 0) return;
+
+    const audioBuffer = this.context.createBuffer(1, pcm.length, this.sampleRate);
+    const channel = audioBuffer.getChannelData(0);
+    for (let index = 0; index < pcm.length; index += 1) {
+      channel[index] = Math.max(-1, Math.min(1, pcm[index] / 32768));
+    }
+
+    const source = this.context.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(this.context.destination);
+    this.sources.add(source);
+    source.addEventListener("ended", () => {
+      this.sources.delete(source);
+    });
+    const startAt = Math.max(this.context.currentTime + 0.02, this.nextStartTime);
+    source.start(startAt);
+    this.nextStartTime = startAt + audioBuffer.duration;
+  }
+}
+
+const speechPlayer = new PcmSpeechPlayer();
 
 function getPhase(): DiscussionPhase {
   if (round <= 1) return "opening";
@@ -216,6 +364,8 @@ function updateStatus(): void {
   startButton.textContent = activeTopic ? "提交追问" : "开始讨论";
   startButton.disabled = isRunning || sessionEnded;
   endButton.disabled = !activeTopic || isRunning || sessionEnded;
+  voiceButton.textContent = voiceEnabled ? "语音开启" : "语音关闭";
+  voiceButton.classList.toggle("is-on", voiceEnabled);
 }
 
 function renderSettings(): void {
@@ -544,9 +694,13 @@ async function speak(
   activeText = "";
   activeSpeaker.textContent = `${speaker.name} 发言中`;
   renderSeats();
+  await speechPlayer.start(speaker).catch((error) => {
+    console.warn("[tts] start failed", error);
+  });
 
   let checkedInterrupt = false;
   let chosenInterruption: SpeakerIntent | undefined;
+  let audioTextLength = 0;
 
   try {
     const result = await generateSpeech(
@@ -554,6 +708,11 @@ async function speak(
       effectiveType === "conclusion" || effectiveIntent.shouldConclude ? "conclusion" : interruption ? "interrupt" : "speech",
       effectiveIntent,
       async (text) => {
+        const audioDelta = text.slice(audioTextLength);
+        if (audioDelta) {
+          audioTextLength = text.length;
+          speechPlayer.send(audioDelta);
+        }
         typewriterSequence = typewriterSequence.then(() =>
           revealSpeechText(speaker, text, async (visibleText) => {
             if (effectiveIntent.shouldConclude || effectiveType === "conclusion" || checkedInterrupt || visibleText.length < 38) return false;
@@ -572,6 +731,7 @@ async function speak(
 
     activeText = result.text;
   } catch (error) {
+    speechPlayer.stop();
     activeText = error instanceof Error ? `模型调用失败：${error.message}` : "模型调用失败。";
     renderActiveSpeech(speaker, activeText);
     addEntry({
@@ -587,6 +747,7 @@ async function speak(
   }
 
   if (chosenInterruption) {
+    speechPlayer.stop();
     const interruptionIntent = allowConclusion ? chosenInterruption : { ...chosenInterruption, shouldConclude: false };
     addEntry({
       type: effectiveType,
@@ -616,6 +777,8 @@ async function speak(
     );
     return { concluded: interruptResult.concluded || interruptionIntent.shouldConclude, speakerId: interruptionResultSpeakerId(interruptResult, interruptionIntent) };
   }
+
+  await speechPlayer.finishAndWait();
 
   addEntry({
     type: effectiveIntent.shouldConclude ? "conclusion" : effectiveType,
@@ -734,6 +897,7 @@ function buildSummary(): string {
 
 function endSession(): void {
   sessionEnded = true;
+  speechPlayer.stop();
   terminateWorkers();
   const summary = buildSummary();
   addEntry({
@@ -795,6 +959,14 @@ startButton.addEventListener("click", async () => {
 });
 
 endButton.addEventListener("click", endSession);
+
+voiceButton.addEventListener("click", () => {
+  voiceEnabled = !voiceEnabled;
+  if (!voiceEnabled) {
+    speechPlayer.stop();
+  }
+  updateStatus();
+});
 
 renderSettings();
 renderSeats();

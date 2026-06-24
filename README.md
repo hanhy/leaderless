@@ -22,6 +22,15 @@ AI_ENABLE_THINKING=false
 AI_CONTEXT_TURNS=6
 AI_SPEECH_MAX_TOKENS=150
 AI_CONCLUSION_MAX_TOKENS=220
+VOLC_TTS_API_KEY=replace-with-your-volcengine-tts-key
+VOLC_TTS_RESOURCE_ID=seed-tts-2.0
+VOLC_TTS_FORMAT=pcm
+VOLC_TTS_SAMPLE_RATE=24000
+VOLC_TTS_SPEAKER_ZHUGE_LIANG=zh_male_ruyaqingnian_uranus_bigtts
+VOLC_TTS_SPEAKER_ZHANG_FEI=zh_male_qingcang_uranus_bigtts
+VOLC_TTS_SPEAKER_LIU_BEI=zh_male_wennuanahu_uranus_bigtts
+VOLC_TTS_SPEAKER_CAO_CAO=zh_male_aojiaobazong_uranus_bigtts
+VOLC_TTS_SPEAKER_GUAN_YU=zh_male_gaolengchenwen_uranus_bigtts
 ```
 
 启动：
@@ -31,4 +40,10 @@ npm install
 npm run dev
 ```
 
-打开 Vite 输出的本地地址。前端会通过 `/api/ai/stream` 调用本地代理，API key 不会进入浏览器代码。
+打开 Vite 输出的本地地址。前端会通过 `/api/ai/stream` 调用本地大模型代理，通过 `/api/tts/stream` 调用本地火山语音代理，API key 不会进入浏览器代码。
+
+## 实时语音
+
+实时语音使用火山引擎豆包语音 `WebSocket 双向流式-V3`。浏览器把每个人的流式发言增量发给本地 Node 服务，本地服务再转成火山引擎二进制帧协议并把 PCM 音频流回浏览器播放。
+
+默认五人音色可以通过 `VOLC_TTS_SPEAKER_*` 环境变量替换。当前默认值是偏角色气质的通用音色，后续可按火山引擎音色列表换成更贴近三国人物的 speaker ID。
