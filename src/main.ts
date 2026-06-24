@@ -1,5 +1,6 @@
 import "./styles.css";
-import roundTableArt from "./assets/round-table-three-kingdoms-pixel.png";
+import journeyWestTableArt from "./assets/round-table-journey-west-pixel.png";
+import threeKingdomsTableArt from "./assets/round-table-three-kingdoms-pixel.png";
 import type {
   DiscussionPhase,
   DiscussionSnapshot,
@@ -16,63 +17,160 @@ const traits: Trait[] = ["分析型", "推进型", "协调型", "质疑型", "�
 const speechStyles: SpeechStyle[] = ["稳健陈述", "主动打断", "强势推进", "温和接续", "结构化总结"];
 const colors = ["#ff5f6d", "#00b4d8", "#f7b801", "#7bd88f", "#a78bfa"];
 
-let people: PersonConfig[] = [
-  {
-    id: 1,
-    name: "点子王-诸葛亮",
-    gender: "男",
-    traits: ["分析型", "总结型", "推进型"],
-    speechStyle: "结构化总结",
-    interruptiveness: 0.52,
-    persistence: 0.8,
-    verbosity: 0.82,
-    color: colors[0]
+type SceneId = "three-kingdoms" | "journey-west";
+
+interface SeatPosition {
+  bubbleX: number;
+  bubbleY: number;
+  labelX: number;
+  labelY: number;
+}
+
+interface SceneConfig {
+  id: SceneId;
+  label: string;
+  title: string;
+  art: string;
+  alt: string;
+  people: PersonConfig[];
+  seats: SeatPosition[];
+}
+
+const scenes: Record<SceneId, SceneConfig> = {
+  "three-kingdoms": {
+    id: "three-kingdoms",
+    label: "场景一：圆桌三国",
+    title: "圆桌三国",
+    art: threeKingdomsTableArt,
+    alt: "诸葛亮、张飞、刘备、曹操、关羽围坐圆桌的像素风场景",
+    people: [
+      {
+        id: 1,
+        name: "点子王-诸葛亮",
+        gender: "男",
+        traits: ["分析型", "总结型", "推进型"],
+        speechStyle: "结构化总结",
+        interruptiveness: 0.52,
+        persistence: 0.8,
+        verbosity: 0.82,
+        color: colors[0]
+      },
+      {
+        id: 2,
+        name: "吵架王-张飞",
+        gender: "男",
+        traits: ["推进型", "质疑型"],
+        speechStyle: "主动打断",
+        interruptiveness: 0.95,
+        persistence: 0.9,
+        verbosity: 0.62,
+        color: colors[1]
+      },
+      {
+        id: 3,
+        name: "端水大师-刘备",
+        gender: "男",
+        traits: ["协调型", "倾听型", "总结型"],
+        speechStyle: "温和接续",
+        interruptiveness: 0.24,
+        persistence: 0.58,
+        verbosity: 0.7,
+        color: colors[2]
+      },
+      {
+        id: 4,
+        name: "土豪哥-曹操",
+        gender: "男",
+        traits: ["推进型", "分析型"],
+        speechStyle: "强势推进",
+        interruptiveness: 0.76,
+        persistence: 0.86,
+        verbosity: 0.68,
+        color: colors[3]
+      },
+      {
+        id: 5,
+        name: "不爱说话-关羽",
+        gender: "男",
+        traits: ["倾听型", "质疑型"],
+        speechStyle: "稳健陈述",
+        interruptiveness: 0.18,
+        persistence: 0.76,
+        verbosity: 0.38,
+        color: colors[4]
+      }
+    ],
+    seats: [
+      { bubbleX: 50, bubbleY: 22, labelX: 50, labelY: 2 },
+      { bubbleX: 77, bubbleY: 40, labelX: 88, labelY: 54 },
+      { bubbleX: 69, bubbleY: 76, labelX: 72, labelY: 95 },
+      { bubbleX: 31, bubbleY: 76, labelX: 28, labelY: 95 },
+      { bubbleX: 23, bubbleY: 40, labelX: 12, labelY: 54 }
+    ]
   },
-  {
-    id: 2,
-    name: "吵架王-张飞",
-    gender: "男",
-    traits: ["推进型", "质疑型"],
-    speechStyle: "主动打断",
-    interruptiveness: 0.95,
-    persistence: 0.9,
-    verbosity: 0.62,
-    color: colors[1]
-  },
-  {
-    id: 3,
-    name: "端水大师-刘备",
-    gender: "男",
-    traits: ["协调型", "倾听型", "总结型"],
-    speechStyle: "温和接续",
-    interruptiveness: 0.24,
-    persistence: 0.58,
-    verbosity: 0.7,
-    color: colors[2]
-  },
-  {
-    id: 4,
-    name: "土豪哥-曹操",
-    gender: "男",
-    traits: ["推进型", "分析型"],
-    speechStyle: "强势推进",
-    interruptiveness: 0.76,
-    persistence: 0.86,
-    verbosity: 0.68,
-    color: colors[3]
-  },
-  {
-    id: 5,
-    name: "不爱说话-关羽",
-    gender: "男",
-    traits: ["倾听型", "质疑型"],
-    speechStyle: "稳健陈述",
-    interruptiveness: 0.18,
-    persistence: 0.76,
-    verbosity: 0.38,
-    color: colors[4]
+  "journey-west": {
+    id: "journey-west",
+    label: "场景二：圆桌西游",
+    title: "圆桌西游",
+    art: journeyWestTableArt,
+    alt: "唐僧、孙悟空、猪八戒、沙僧围坐圆桌的像素风场景",
+    people: [
+      {
+        id: 1,
+        name: "唐僧",
+        gender: "男",
+        traits: ["协调型", "倾听型", "总结型"],
+        speechStyle: "温和接续",
+        interruptiveness: 0.16,
+        persistence: 0.68,
+        verbosity: 0.72,
+        color: colors[0]
+      },
+      {
+        id: 2,
+        name: "孙悟空",
+        gender: "男",
+        traits: ["推进型", "质疑型", "分析型"],
+        speechStyle: "主动打断",
+        interruptiveness: 0.92,
+        persistence: 0.9,
+        verbosity: 0.58,
+        color: colors[1]
+      },
+      {
+        id: 3,
+        name: "猪八戒",
+        gender: "男",
+        traits: ["质疑型", "协调型"],
+        speechStyle: "强势推进",
+        interruptiveness: 0.66,
+        persistence: 0.62,
+        verbosity: 0.7,
+        color: colors[2]
+      },
+      {
+        id: 4,
+        name: "沙僧",
+        gender: "男",
+        traits: ["倾听型", "总结型"],
+        speechStyle: "稳健陈述",
+        interruptiveness: 0.22,
+        persistence: 0.72,
+        verbosity: 0.46,
+        color: colors[3]
+      }
+    ],
+    seats: [
+      { bubbleX: 50, bubbleY: 24, labelX: 50, labelY: 3 },
+      { bubbleX: 22, bubbleY: 48, labelX: 10, labelY: 61 },
+      { bubbleX: 78, bubbleY: 48, labelX: 90, labelY: 61 },
+      { bubbleX: 50, bubbleY: 82, labelX: 50, labelY: 96 }
+    ]
   }
-];
+};
+
+let currentSceneId: SceneId = "three-kingdoms";
+let people: PersonConfig[] = clonePeople(scenes[currentSceneId].people);
 
 let workers = new Map<number, Worker>();
 let transcript: TranscriptEntry[] = [];
@@ -100,8 +198,16 @@ app.innerHTML = `
         <span class="brand-mark" aria-hidden="true"></span>
         <div>
           <h1>无领导小组讨论模拟器</h1>
-          <p>五个独立 worker 轮流发言，并在合适时机抢话、让话和总结。</p>
+          <p>多角色独立 worker 轮流发言，并在合适时机抢话、让话和总结。</p>
         </div>
+        <label class="scene-picker">
+          <span>场景</span>
+          <select id="sceneSelect" aria-label="选择场景">
+            ${Object.values(scenes)
+              .map((scene) => `<option value="${scene.id}" ${scene.id === currentSceneId ? "selected" : ""}>${scene.label}</option>`)
+              .join("")}
+          </select>
+        </label>
       </div>
 
       <section class="panel-section">
@@ -129,9 +235,9 @@ app.innerHTML = `
     <section class="stage" aria-label="圆桌讨论区">
       <div class="table-zone">
         <div class="round-table">
-          <img class="pixel-scene" src="${roundTableArt}" alt="诸葛亮、张飞、刘备、曹操、关羽围坐圆桌的像素风场景" />
+          <img id="sceneImage" class="pixel-scene" src="${currentScene().art}" alt="${currentScene().alt}" />
           <div class="phase-badge">
-            <span>圆桌</span>
+            <span id="sceneTitle">${currentScene().title}</span>
             <strong id="phaseLabel">等待议题</strong>
           </div>
           <div id="seatLayer" class="seat-layer"></div>
@@ -144,7 +250,7 @@ app.innerHTML = `
           <h2>实时讨论</h2>
           <span id="activeSpeaker" class="muted">暂无发言</span>
         </div>
-        <div id="activeSpeech" class="active-speech">输入议题后，五位成员会开始讨论。</div>
+        <div id="activeSpeech" class="active-speech">输入议题后，成员会开始讨论。</div>
         <div id="transcriptList" class="transcript-list"></div>
       </aside>
     </section>
@@ -155,6 +261,9 @@ const peopleSettings = document.querySelector<HTMLDivElement>("#peopleSettings")
 const seatLayer = document.querySelector<HTMLDivElement>("#seatLayer")!;
 const transcriptList = document.querySelector<HTMLDivElement>("#transcriptList")!;
 const questionInput = document.querySelector<HTMLTextAreaElement>("#questionInput")!;
+const sceneSelect = document.querySelector<HTMLSelectElement>("#sceneSelect")!;
+const sceneImage = document.querySelector<HTMLImageElement>("#sceneImage")!;
+const sceneTitle = document.querySelector<HTMLSpanElement>("#sceneTitle")!;
 const startButton = document.querySelector<HTMLButtonElement>("#startButton")!;
 const endButton = document.querySelector<HTMLButtonElement>("#endButton")!;
 const voiceButton = document.querySelector<HTMLButtonElement>("#voiceButton")!;
@@ -180,6 +289,17 @@ function escapeHtml(value: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
+}
+
+function clonePeople(source: PersonConfig[]): PersonConfig[] {
+  return source.map((person) => ({
+    ...person,
+    traits: [...person.traits]
+  }));
+}
+
+function currentScene(): SceneConfig {
+  return scenes[currentSceneId];
 }
 
 class PcmSpeechPlayer {
@@ -376,12 +496,24 @@ function updateStatus(): void {
   const phase = getPhase();
   roundState.textContent = `第 ${round} 轮`;
   phaseLabel.textContent = sessionEnded ? "已结束" : activeTopic ? phaseText(phase) : "等待议题";
+  sceneTitle.textContent = currentScene().title;
   sessionState.textContent = sessionEnded ? "已总结" : isRunning ? "讨论中" : activeTopic ? "可追问" : "未开始";
   startButton.textContent = activeTopic ? "提交追问" : "开始讨论";
   startButton.disabled = isRunning || sessionEnded;
   endButton.disabled = !activeTopic || isRunning || sessionEnded;
+  sceneSelect.disabled = isRunning;
   voiceButton.textContent = voiceEnabled ? "语音开启" : "语音关闭";
   voiceButton.classList.toggle("is-on", voiceEnabled);
+}
+
+function renderScene(): void {
+  sceneSelect.value = currentSceneId;
+  sceneImage.src = currentScene().art;
+  sceneImage.alt = currentScene().alt;
+  sceneTitle.textContent = currentScene().title;
+  renderSettings();
+  renderSeats();
+  updateStatus();
 }
 
 function renderSettings(): void {
@@ -437,17 +569,11 @@ function renderSettings(): void {
 }
 
 function renderSeats(): void {
-  const positions = [
-    { bubbleX: 50, bubbleY: 22, labelX: 50, labelY: 2 },
-    { bubbleX: 77, bubbleY: 40, labelX: 88, labelY: 54 },
-    { bubbleX: 69, bubbleY: 76, labelX: 72, labelY: 95 },
-    { bubbleX: 31, bubbleY: 76, labelX: 28, labelY: 95 },
-    { bubbleX: 23, bubbleY: 40, labelX: 12, labelY: 54 }
-  ];
+  const positions = currentScene().seats;
   seatLayer.innerHTML = people
     .map((person, index) => {
       const isActive = activeSpeakerId === person.id;
-      const position = positions[index];
+      const position = positions[index] ?? positions[0];
       const bubbleText = getBubbleText(activeText);
 
       return `
@@ -521,6 +647,28 @@ function ensureWorkers(): void {
 function terminateWorkers(): void {
   workers.forEach((worker) => worker.terminate());
   workers = new Map<number, Worker>();
+}
+
+function resetSessionForScene(nextSceneId: SceneId): void {
+  speechPlayer.stop();
+  terminateWorkers();
+  currentSceneId = nextSceneId;
+  people = clonePeople(currentScene().people);
+  transcript = [];
+  activeTopic = "";
+  activeQuestion = "";
+  activeSpeakerId = undefined;
+  activeText = "";
+  round = 0;
+  isRunning = false;
+  sessionEnded = false;
+  lastConclusion = "";
+  typewriterSequence = Promise.resolve(false);
+  questionInput.value = "";
+  activeSpeaker.textContent = "暂无发言";
+  activeSpeech.textContent = "输入议题后，成员会开始讨论。";
+  renderScene();
+  renderTranscript();
 }
 
 function askWorker(worker: Worker, request: WorkerRequest): Promise<WorkerResponse> {
@@ -858,8 +1006,8 @@ async function runDiscussion(question: string): Promise<void> {
 
   let concluded = false;
   const roundParticipants = new Set<number>();
-  const minParticipantsBeforeConclusion = 3;
-  const maxTurns = Math.max(7, Math.min(10, 6 + Math.round(question.length / 24)));
+  const minParticipantsBeforeConclusion = Math.min(3, people.length);
+  const maxTurns = Math.max(people.length + 2, Math.min(10, people.length + 1 + Math.round(question.length / 24)));
 
   for (let turn = 0; turn < maxTurns && !concluded && !sessionEnded; turn += 1) {
     round += 1;
@@ -909,7 +1057,7 @@ function buildSummary(): string {
 
   return [
     `本场讨论围绕 ${questions.length} 个议题/追问展开：${questions.join("；")}`,
-    `五位成员共发生 ${interruptions} 次打断仲裁，发言参与度为：${participation}。`,
+    `${people.length}位成员共发生 ${interruptions} 次打断仲裁，发言参与度为：${participation}。`,
     `主要结论：${conclusions.slice(-3).join("；") || "尚未形成明确结论"}。`,
     "建议后续把结论拆成负责人、截止时间和验证指标，避免共识停留在口头层面。"
   ].join("\n");
@@ -980,6 +1128,12 @@ startButton.addEventListener("click", async () => {
 
 endButton.addEventListener("click", endSession);
 
+sceneSelect.addEventListener("change", () => {
+  const nextSceneId = sceneSelect.value as SceneId;
+  if (nextSceneId === currentSceneId || isRunning) return;
+  resetSessionForScene(nextSceneId);
+});
+
 voiceButton.addEventListener("click", () => {
   voiceEnabled = !voiceEnabled;
   if (!voiceEnabled) {
@@ -988,8 +1142,7 @@ voiceButton.addEventListener("click", () => {
   updateStatus();
 });
 
-renderSettings();
-renderSeats();
+renderScene();
 renderTranscript();
 bindSettingsEvents();
 updateStatus();

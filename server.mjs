@@ -54,7 +54,11 @@ const roleSpeakerFallbacks = {
   "张飞": "zh_male_qingcang_uranus_bigtts",
   "刘备": "zh_male_wennuanahu_uranus_bigtts",
   "曹操": "zh_male_aojiaobazong_uranus_bigtts",
-  "关羽": "zh_male_gaolengchenwen_uranus_bigtts"
+  "关羽": "zh_male_gaolengchenwen_uranus_bigtts",
+  "唐僧": "zh_male_ruyaqingnian_uranus_bigtts",
+  "孙悟空": "zh_male_qingcang_uranus_bigtts",
+  "猪八戒": "zh_male_wennuanahu_uranus_bigtts",
+  "沙僧": "zh_male_gaolengchenwen_uranus_bigtts"
 };
 
 const roleAudioParams = {
@@ -62,7 +66,11 @@ const roleAudioParams = {
   "张飞": { speech_rate: 18, loudness_rate: 18, emotion: "angry", emotion_scale: 3 },
   "刘备": { speech_rate: -2, loudness_rate: 0 },
   "曹操": { speech_rate: 8, loudness_rate: 10 },
-  "关羽": { speech_rate: -12, loudness_rate: 6 }
+  "关羽": { speech_rate: -12, loudness_rate: 6 },
+  "唐僧": { speech_rate: -8, loudness_rate: 0 },
+  "孙悟空": { speech_rate: 16, loudness_rate: 10 },
+  "猪八戒": { speech_rate: 6, loudness_rate: 8 },
+  "沙僧": { speech_rate: -10, loudness_rate: 4 }
 };
 
 const mimeTypes = {
@@ -131,7 +139,7 @@ function styleInstruction(style) {
 }
 
 function roleName(name = "") {
-  for (const role of ["诸葛亮", "张飞", "刘备", "曹操", "关羽"]) {
+  for (const role of ["诸葛亮", "张飞", "刘备", "曹操", "关羽", "唐僧", "孙悟空", "猪八戒", "沙僧"]) {
     if (name.includes(role)) return role;
   }
   return name;
@@ -143,7 +151,11 @@ function speakerEnvKey(role) {
     "张飞": "VOLC_TTS_SPEAKER_ZHANG_FEI",
     "刘备": "VOLC_TTS_SPEAKER_LIU_BEI",
     "曹操": "VOLC_TTS_SPEAKER_CAO_CAO",
-    "关羽": "VOLC_TTS_SPEAKER_GUAN_YU"
+    "关羽": "VOLC_TTS_SPEAKER_GUAN_YU",
+    "唐僧": "VOLC_TTS_SPEAKER_TANG_SENG",
+    "孙悟空": "VOLC_TTS_SPEAKER_SUN_WUKONG",
+    "猪八戒": "VOLC_TTS_SPEAKER_ZHU_BAJIE",
+    "沙僧": "VOLC_TTS_SPEAKER_SHA_SENG"
   };
   return keys[role];
 }
@@ -160,7 +172,11 @@ function addressInstruction(person) {
     关羽: "刘备=大哥，张飞=三弟，诸葛亮=军师，曹操=曹贼",
     诸葛亮: "刘备=主公，张飞=翼德，关羽=云长，曹操=曹贼",
     刘备: "诸葛亮=军师，张飞=三弟，关羽=二弟，曹操=曹贼",
-    曹操: "诸葛亮=诸葛村夫，张飞=环眼贼，关羽=关将军，刘备=大耳贼"
+    曹操: "诸葛亮=诸葛村夫，张飞=环眼贼，关羽=关将军，刘备=大耳贼",
+    唐僧: "孙悟空=悟空，猪八戒=八戒，沙僧=悟净",
+    孙悟空: "唐僧=师傅，猪八戒=八戒/呆子，沙僧=沙师弟",
+    猪八戒: "唐僧=师傅，孙悟空=猴哥，沙僧=沙师弟",
+    沙僧: "唐僧=师傅，孙悟空=大师兄，猪八戒=二师兄"
   };
   const rule = rules[roleName(person.name)];
   return rule ? `称呼规则：提到他人时必须用这些称呼：${rule}。` : "";

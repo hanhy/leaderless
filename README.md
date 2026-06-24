@@ -31,6 +31,10 @@ VOLC_TTS_SPEAKER_ZHANG_FEI=zh_male_qingcang_uranus_bigtts
 VOLC_TTS_SPEAKER_LIU_BEI=zh_male_wennuanahu_uranus_bigtts
 VOLC_TTS_SPEAKER_CAO_CAO=zh_male_aojiaobazong_uranus_bigtts
 VOLC_TTS_SPEAKER_GUAN_YU=zh_male_gaolengchenwen_uranus_bigtts
+VOLC_TTS_SPEAKER_TANG_SENG=zh_male_ruyaqingnian_uranus_bigtts
+VOLC_TTS_SPEAKER_SUN_WUKONG=zh_male_qingcang_uranus_bigtts
+VOLC_TTS_SPEAKER_ZHU_BAJIE=zh_male_wennuanahu_uranus_bigtts
+VOLC_TTS_SPEAKER_SHA_SENG=zh_male_gaolengchenwen_uranus_bigtts
 ```
 
 启动：
@@ -46,4 +50,8 @@ npm run dev
 
 实时语音使用火山引擎豆包语音 `WebSocket 双向流式-V3`。浏览器把每个人的流式发言增量发给本地 Node 服务，本地服务再转成火山引擎二进制帧协议并把 PCM 音频流回浏览器播放。
 
-默认五人音色可以通过 `VOLC_TTS_SPEAKER_*` 环境变量替换。当前默认值是偏角色气质的通用音色，后续可按火山引擎音色列表换成更贴近三国人物的 speaker ID。
+默认角色音色可以通过 `VOLC_TTS_SPEAKER_*` 环境变量替换。当前默认值是偏角色气质的通用音色，后续可按火山引擎音色列表换成更贴近人物的 speaker ID。
+
+## 场景
+
+左上角可以切换场景：`圆桌三国` 使用诸葛亮、张飞、刘备、曹操、关羽；`圆桌西游` 使用唐僧、孙悟空、猪八戒、沙僧。切换场景会重置当前讨论记录和人物配置。

@@ -68,7 +68,7 @@ button:disabled {
 
 .brand {
   display: grid;
-  grid-template-columns: 44px 1fr;
+  grid-template-columns: 44px minmax(0, 1fr);
   gap: 12px;
   align-items: center;
 }
@@ -103,6 +103,16 @@ h2 {
 .brand p,
 .muted {
   color: #aab3c4;
+  font-size: 12px;
+}
+
+.scene-picker {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  color: #cbd4e5;
   font-size: 12px;
 }
 
