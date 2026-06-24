@@ -285,7 +285,7 @@ input[type="range"] {
   place-items: center;
   min-height: 580px;
   border-radius: 8px;
-  background: #90d06f;
+  background: #9bc976;
   border: 1px solid rgba(255, 255, 255, 0.09);
   overflow: hidden;
 }
@@ -295,6 +295,10 @@ input[type="range"] {
   width: min(76vh, 680px);
   max-width: calc(100vw - 520px);
   aspect-ratio: 1;
+}
+
+.round-table:has(.interrupt-effect.is-bursting) {
+  animation: table-hit 1000ms steps(2, end);
 }
 
 .pixel-scene {
@@ -340,17 +344,60 @@ input[type="range"] {
   inset: 0;
 }
 
+.interrupt-effect {
+  position: absolute;
+  left: 50%;
+  top: 47%;
+  z-index: 8;
+  display: grid;
+  place-items: center;
+  min-width: 150px;
+  min-height: 48px;
+  padding: 8px 14px;
+  border: 4px solid #1d120b;
+  background: #ffef62;
+  box-shadow: 5px 5px 0 #e34724, -5px -5px 0 #ffffff;
+  color: #1d120b;
+  font-weight: 900;
+  opacity: 0;
+  pointer-events: none;
+  text-align: center;
+  transform: translate(-50%, -50%) scale(0.7);
+}
+
+.interrupt-effect::before,
+.interrupt-effect::after {
+  content: "";
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  background: #e34724;
+  box-shadow:
+    28px -12px 0 #ffffff,
+    -24px 18px 0 #ffef62,
+    44px 20px 0 #1d120b,
+    -42px -16px 0 #ffffff;
+  image-rendering: pixelated;
+}
+
+.interrupt-effect::before {
+  left: -38px;
+  top: -16px;
+}
+
+.interrupt-effect::after {
+  right: -30px;
+  bottom: -18px;
+}
+
+.interrupt-effect.is-bursting {
+  animation: interrupt-burst 1000ms steps(5, end);
+}
+
 .seat {
   position: absolute;
-  left: var(--x);
-  top: var(--y);
+  inset: 0;
   z-index: 4;
-  display: grid;
-  justify-items: center;
-  gap: 5px;
-  width: 168px;
-  transform: translate(-50%, -100%);
-  transition: filter 180ms ease, transform 180ms ease;
   pointer-events: none;
 }
 
@@ -359,20 +406,28 @@ input[type="range"] {
 }
 
 .seat-label {
+  position: absolute;
+  left: var(--label-x);
+  top: var(--label-y);
   display: grid;
   justify-items: center;
   gap: 2px;
-  max-width: 150px;
+  width: 142px;
   border: 2px solid #241a12;
   padding: 4px 7px;
   background: #fff6c7;
   box-shadow: 3px 3px 0 #5e4229;
   color: #241a12;
   text-align: center;
+  transform: translate(-50%, -50%);
 }
 
 .seat-label strong {
   font-size: 14px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .seat-label span {
@@ -381,10 +436,11 @@ input[type="range"] {
 }
 
 .pixel-bubble {
-  position: relative;
-  width: min(250px, 36vw);
-  min-height: 54px;
-  max-height: 118px;
+  position: absolute;
+  left: var(--bubble-x);
+  top: var(--bubble-y);
+  width: clamp(190px, 30vw, 250px);
+  height: 96px;
   overflow: hidden;
   border: 3px solid #23170f;
   padding: 9px 10px;
@@ -394,6 +450,27 @@ input[type="range"] {
   font-size: 13px;
   line-height: 1.45;
   text-align: left;
+  overflow-wrap: anywhere;
+  transform: translate(-50%, -100%);
+}
+
+.pixel-bubble-text {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: 9px;
+  bottom: 9px;
+  display: block;
+  overflow: auto;
+  line-height: 1.45;
+  text-align: left;
+  white-space: normal;
+  word-break: break-all;
+  scrollbar-width: none;
+}
+
+.pixel-bubble-text::-webkit-scrollbar {
+  display: none;
 }
 
 .pixel-bubble::after {
@@ -422,6 +499,58 @@ input[type="range"] {
 @keyframes blink {
   50% {
     opacity: 0;
+  }
+}
+
+@keyframes interrupt-burst {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.55) rotate(-6deg);
+  }
+
+  12%,
+  72% {
+    opacity: 1;
+  }
+
+  24% {
+    transform: translate(calc(-50% - 8px), calc(-50% + 5px)) scale(1.06) rotate(3deg);
+  }
+
+  46% {
+    transform: translate(calc(-50% + 7px), calc(-50% - 4px)) scale(1) rotate(-2deg);
+  }
+
+  76% {
+    transform: translate(-50%, -50%) scale(0.92);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.72);
+  }
+}
+
+@keyframes table-hit {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+
+  18% {
+    transform: translate(-4px, 2px);
+  }
+
+  36% {
+    transform: translate(4px, -2px);
+  }
+
+  54% {
+    transform: translate(-2px, -2px);
+  }
+
+  72% {
+    transform: translate(2px, 2px);
   }
 }
 

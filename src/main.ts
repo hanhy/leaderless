@@ -1,5 +1,5 @@
 import "./styles.css";
-import roundTableArt from "./assets/round-table-five-people-pixel.png";
+import roundTableArt from "./assets/round-table-three-kingdoms-pixel.png";
 import type {
   DiscussionPhase,
   DiscussionSnapshot,
@@ -19,57 +19,57 @@ const colors = ["#ff5f6d", "#00b4d8", "#f7b801", "#7bd88f", "#a78bfa"];
 let people: PersonConfig[] = [
   {
     id: 1,
-    name: "林蔚",
-    gender: "女",
-    traits: ["分析型", "总结型"],
+    name: "点子王-诸葛亮",
+    gender: "男",
+    traits: ["分析型", "总结型", "推进型"],
     speechStyle: "结构化总结",
-    interruptiveness: 0.42,
-    persistence: 0.72,
-    verbosity: 0.66,
+    interruptiveness: 0.52,
+    persistence: 0.8,
+    verbosity: 0.82,
     color: colors[0]
   },
   {
     id: 2,
-    name: "周远",
+    name: "吵架王-张飞",
     gender: "男",
     traits: ["推进型", "质疑型"],
-    speechStyle: "强势推进",
-    interruptiveness: 0.68,
-    persistence: 0.84,
-    verbosity: 0.5,
+    speechStyle: "主动打断",
+    interruptiveness: 0.95,
+    persistence: 0.9,
+    verbosity: 0.62,
     color: colors[1]
   },
   {
     id: 3,
-    name: "唐宁",
-    gender: "女",
-    traits: ["协调型", "倾听型"],
+    name: "端水大师-刘备",
+    gender: "男",
+    traits: ["协调型", "倾听型", "总结型"],
     speechStyle: "温和接续",
-    interruptiveness: 0.2,
-    persistence: 0.34,
-    verbosity: 0.48,
+    interruptiveness: 0.24,
+    persistence: 0.58,
+    verbosity: 0.7,
     color: colors[2]
   },
   {
     id: 4,
-    name: "沈砚",
+    name: "土豪哥-曹操",
     gender: "男",
-    traits: ["质疑型", "分析型"],
-    speechStyle: "主动打断",
-    interruptiveness: 0.86,
-    persistence: 0.62,
-    verbosity: 0.56,
+    traits: ["推进型", "分析型"],
+    speechStyle: "强势推进",
+    interruptiveness: 0.76,
+    persistence: 0.86,
+    verbosity: 0.68,
     color: colors[3]
   },
   {
     id: 5,
-    name: "许嘉",
-    gender: "其他",
-    traits: ["推进型", "总结型"],
+    name: "不爱说话-关羽",
+    gender: "男",
+    traits: ["倾听型", "质疑型"],
     speechStyle: "稳健陈述",
-    interruptiveness: 0.36,
-    persistence: 0.54,
-    verbosity: 0.72,
+    interruptiveness: 0.18,
+    persistence: 0.76,
+    verbosity: 0.38,
     color: colors[4]
   }
 ];
@@ -84,6 +84,7 @@ let round = 0;
 let isRunning = false;
 let sessionEnded = false;
 let lastConclusion = "";
+let typewriterSequence: Promise<boolean> = Promise.resolve(false);
 
 const app = document.querySelector<HTMLDivElement>("#app");
 
@@ -126,12 +127,13 @@ app.innerHTML = `
     <section class="stage" aria-label="圆桌讨论区">
       <div class="table-zone">
         <div class="round-table">
-          <img class="pixel-scene" src="${roundTableArt}" alt="五人围坐圆桌的像素风场景" />
+          <img class="pixel-scene" src="${roundTableArt}" alt="诸葛亮、张飞、刘备、曹操、关羽围坐圆桌的像素风场景" />
           <div class="phase-badge">
             <span>圆桌</span>
             <strong id="phaseLabel">等待议题</strong>
           </div>
           <div id="seatLayer" class="seat-layer"></div>
+          <div id="interruptEffect" class="interrupt-effect" aria-hidden="true"></div>
         </div>
       </div>
 
@@ -158,6 +160,7 @@ const activeSpeaker = document.querySelector<HTMLSpanElement>("#activeSpeaker")!
 const sessionState = document.querySelector<HTMLSpanElement>("#sessionState")!;
 const roundState = document.querySelector<HTMLSpanElement>("#roundState")!;
 const phaseLabel = document.querySelector<HTMLElement>("#phaseLabel")!;
+const interruptEffect = document.querySelector<HTMLDivElement>("#interruptEffect")!;
 
 function createId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -269,23 +272,26 @@ function renderSettings(): void {
 
 function renderSeats(): void {
   const positions = [
-    { x: 50, y: 18 },
-    { x: 71, y: 42 },
-    { x: 68, y: 76 },
-    { x: 32, y: 76 },
-    { x: 28, y: 42 }
+    { bubbleX: 50, bubbleY: 22, labelX: 50, labelY: 2 },
+    { bubbleX: 77, bubbleY: 40, labelX: 88, labelY: 54 },
+    { bubbleX: 69, bubbleY: 76, labelX: 72, labelY: 95 },
+    { bubbleX: 31, bubbleY: 76, labelX: 28, labelY: 95 },
+    { bubbleX: 23, bubbleY: 40, labelX: 12, labelY: 54 }
   ];
   seatLayer.innerHTML = people
     .map((person, index) => {
       const isActive = activeSpeakerId === person.id;
       const position = positions[index];
-      const bubbleText = activeText.length > 120 ? activeText.slice(-120) : activeText;
+      const bubbleText = getBubbleText(activeText);
 
       return `
-        <article class="seat ${isActive ? "is-active" : ""}" style="--x:${position.x}%; --y:${position.y}%; --person-color:${person.color}">
+        <article
+          class="seat ${isActive ? "is-active" : ""}"
+          style="--bubble-x:${position.bubbleX}%; --bubble-y:${position.bubbleY}%; --label-x:${position.labelX}%; --label-y:${position.labelY}%; --person-color:${person.color}"
+        >
           ${
             isActive
-              ? `<div class="pixel-bubble" aria-live="polite">${escapeHtml(bubbleText || "思考中...")}<span class="type-cursor"></span></div>`
+              ? `<div class="pixel-bubble" aria-live="polite"><div class="pixel-bubble-text">${escapeHtml(bubbleText || "思考中...")}<span class="type-cursor"></span></div></div>`
               : ""
           }
           <div class="seat-label">
@@ -296,6 +302,10 @@ function renderSeats(): void {
       `;
     })
     .join("");
+}
+
+function getBubbleText(text: string): string {
+  return text;
 }
 
 function renderTranscript(): void {
@@ -409,6 +419,54 @@ function splitSpeech(text: string): string[] {
 function renderActiveSpeech(speaker: PersonConfig, text: string): void {
   activeSpeech.innerHTML = `<strong style="color:${speaker.color}">${escapeHtml(speaker.name)}</strong><p>${escapeHtml(text)}</p>`;
   renderSeats();
+  scrollActiveBubbleToBottom();
+}
+
+function scrollActiveBubbleToBottom(): void {
+  window.requestAnimationFrame(() => {
+    const bubbleText = seatLayer.querySelector<HTMLDivElement>(".pixel-bubble-text");
+    if (bubbleText) {
+      bubbleText.scrollTop = bubbleText.scrollHeight;
+    }
+  });
+}
+
+async function revealSpeechText(
+  speaker: PersonConfig,
+  nextText: string,
+  onTick: (visibleText: string) => Promise<boolean> | boolean
+): Promise<boolean> {
+  const startIndex = activeText.length;
+  if (nextText.length <= startIndex) return onTick(activeText);
+
+  for (let index = startIndex + 1; index <= nextText.length; index += 1) {
+    activeText = nextText.slice(0, index);
+    renderActiveSpeech(speaker, activeText);
+
+    const interrupted = await onTick(activeText);
+    if (interrupted) return true;
+
+    const currentChar = activeText[index - 1];
+    if (/[，、,]/.test(currentChar)) {
+      await sleep(100);
+    } else if (/[。！？；.!?;]/.test(currentChar)) {
+      await sleep(180);
+    } else {
+      await sleep(46);
+    }
+  }
+
+  return false;
+}
+
+function triggerInterruptEffect(name: string): void {
+  interruptEffect.textContent = `${name} 打断!`;
+  interruptEffect.classList.remove("is-bursting");
+  void interruptEffect.offsetWidth;
+  interruptEffect.classList.add("is-bursting");
+  window.setTimeout(() => {
+    interruptEffect.classList.remove("is-bursting");
+  }, 1000);
 }
 
 async function maybeInterrupt(speaker: PersonConfig, spokenRatio: number): Promise<SpeakerIntent | undefined> {
@@ -474,10 +532,13 @@ async function generateSpeech(
 async function speak(
   intent: SpeakerIntent,
   type: TranscriptEntry["type"] = "speech",
-  interruption?: { speakerName: string; partialText: string; reason: string }
-): Promise<boolean> {
+  interruption?: { speakerName: string; partialText: string; reason: string },
+  allowConclusion = true
+): Promise<{ concluded: boolean; speakerId?: number }> {
   const speaker = people.find((person) => person.id === intent.personId);
-  if (!speaker) return false;
+  if (!speaker) return { concluded: false };
+  const effectiveIntent = allowConclusion ? intent : { ...intent, shouldConclude: false };
+  const effectiveType = allowConclusion ? type : "speech";
 
   activeSpeakerId = speaker.id;
   activeText = "";
@@ -490,19 +551,21 @@ async function speak(
   try {
     const result = await generateSpeech(
       speaker,
-      type === "conclusion" || intent.shouldConclude ? "conclusion" : interruption ? "interrupt" : "speech",
-      intent,
+      effectiveType === "conclusion" || effectiveIntent.shouldConclude ? "conclusion" : interruption ? "interrupt" : "speech",
+      effectiveIntent,
       async (text) => {
-        activeText = text;
-        renderActiveSpeech(speaker, activeText);
+        typewriterSequence = typewriterSequence.then(() =>
+          revealSpeechText(speaker, text, async (visibleText) => {
+            if (effectiveIntent.shouldConclude || effectiveType === "conclusion" || checkedInterrupt || visibleText.length < 38) return false;
 
-        if (intent.shouldConclude || type === "conclusion" || checkedInterrupt || activeText.length < 38) return false;
-
-        const spokenRatio = Math.min(0.9, Math.max(0.32, activeText.length / 180));
-        checkedInterrupt = true;
-        await sleep(160);
-        chosenInterruption = await maybeInterrupt(speaker, spokenRatio);
-        return Boolean(chosenInterruption);
+            const spokenRatio = Math.min(0.9, Math.max(0.32, visibleText.length / 180));
+            checkedInterrupt = true;
+            await sleep(160);
+            chosenInterruption = await maybeInterrupt(speaker, spokenRatio);
+            return Boolean(chosenInterruption);
+          })
+        );
+        return typewriterSequence;
       },
       interruption
     );
@@ -520,19 +583,20 @@ async function speak(
     activeSpeakerId = undefined;
     activeSpeaker.textContent = "模型调用失败";
     renderSeats();
-    return false;
+    return { concluded: false, speakerId: speaker.id };
   }
 
   if (chosenInterruption) {
-    const interruptionIntent = chosenInterruption;
+    const interruptionIntent = allowConclusion ? chosenInterruption : { ...chosenInterruption, shouldConclude: false };
     addEntry({
-      type,
+      type: effectiveType,
       speakerId: speaker.id,
       speakerName: speaker.name,
       text: `${activeText}（被打断）`,
       phase: getPhase()
     });
     const interrupter = people.find((person) => person.id === interruptionIntent.personId);
+    triggerInterruptEffect(interrupter?.name ?? "有人");
     addEntry({
       type: "interrupt",
       speakerId: interruptionIntent.personId,
@@ -540,26 +604,38 @@ async function speak(
       text: `${interrupter?.name ?? "有人"}插入发言。触发原因：${interruptionIntent.reason}`,
       phase: getPhase()
     });
-    await speak(interruptionIntent, interruptionIntent.shouldConclude ? "conclusion" : "speech", {
-      speakerName: speaker.name,
-      partialText: activeText,
-      reason: interruptionIntent.reason
-    });
-    return interruptionIntent.shouldConclude;
+    const interruptResult = await speak(
+      interruptionIntent,
+      interruptionIntent.shouldConclude ? "conclusion" : "speech",
+      {
+        speakerName: speaker.name,
+        partialText: activeText,
+        reason: interruptionIntent.reason
+      },
+      allowConclusion
+    );
+    return { concluded: interruptResult.concluded || interruptionIntent.shouldConclude, speakerId: interruptionResultSpeakerId(interruptResult, interruptionIntent) };
   }
 
   addEntry({
-    type: intent.shouldConclude ? "conclusion" : type,
+    type: effectiveIntent.shouldConclude ? "conclusion" : effectiveType,
     speakerId: speaker.id,
     speakerName: speaker.name,
     text: activeText,
     phase: getPhase()
   });
-  lastConclusion = intent.shouldConclude ? `${speaker.name}代表小组宣读结论：${activeText}` : lastConclusion;
+  lastConclusion = effectiveIntent.shouldConclude ? `${speaker.name}代表小组宣读结论：${activeText}` : lastConclusion;
   activeSpeakerId = undefined;
   activeSpeaker.textContent = "等待下一轮";
   renderSeats();
-  return intent.shouldConclude;
+  return { concluded: effectiveIntent.shouldConclude, speakerId: speaker.id };
+}
+
+function interruptionResultSpeakerId(
+  result: { concluded: boolean; speakerId?: number },
+  fallback: SpeakerIntent
+): number {
+  return result.speakerId ?? fallback.personId;
 }
 
 function selectRepresentative(): PersonConfig {
@@ -598,15 +674,29 @@ async function runDiscussion(question: string): Promise<void> {
   });
 
   let concluded = false;
+  const roundParticipants = new Set<number>();
+  const minParticipantsBeforeConclusion = 3;
   const maxTurns = Math.max(7, Math.min(10, 6 + Math.round(question.length / 24)));
 
   for (let turn = 0; turn < maxTurns && !concluded && !sessionEnded; turn += 1) {
     round += 1;
     updateStatus();
     const intents = await evaluateAll();
-    const selected = intents.sort((a, b) => b.desire + b.confidence * 0.36 - (a.desire + a.confidence * 0.36))[0];
+    const sortedIntents = intents.sort((a, b) => b.desire + b.confidence * 0.36 - (a.desire + a.confidence * 0.36));
+    const selected = roundParticipants.size < minParticipantsBeforeConclusion
+      ? sortedIntents.find((intent) => !roundParticipants.has(intent.personId)) ?? sortedIntents[0]
+      : sortedIntents[0];
     if (!selected) break;
-    concluded = await speak(selected, selected.shouldConclude ? "conclusion" : "speech");
+    const allowConclusion = roundParticipants.size >= minParticipantsBeforeConclusion;
+    const beforeSpeakIndex = transcript.length;
+    const result = await speak(selected, selected.shouldConclude ? "conclusion" : "speech", undefined, allowConclusion);
+    transcript.slice(beforeSpeakIndex).forEach((entry) => {
+      if (entry.speakerId && (entry.type === "speech" || entry.type === "conclusion")) {
+        roundParticipants.add(entry.speakerId);
+      }
+    });
+    if (result.speakerId) roundParticipants.add(result.speakerId);
+    concluded = result.concluded && roundParticipants.size >= minParticipantsBeforeConclusion;
     await sleep(240);
   }
 

@@ -1,5 +1,7 @@
 import { createServer } from "node:http";
-import { existsSync, readFileSync } from "node:fs";
+import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
+import { extname, join, normalize, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 function loadEnvFile() {
   if (!existsSync(".env")) return;
@@ -16,10 +18,26 @@ function loadEnvFile() {
 
 loadEnvFile();
 
+const __dirname = fileURLToPath(new URL(".", import.meta.url));
+const staticRoot = resolve(__dirname, "dist");
 const port = Number(process.env.API_PORT ?? 8787);
+const host = process.env.HOST ?? "127.0.0.1";
 const contextTurns = Number(process.env.AI_CONTEXT_TURNS ?? 6);
 const speechMaxTokens = Number(process.env.AI_SPEECH_MAX_TOKENS ?? 150);
 const conclusionMaxTokens = Number(process.env.AI_CONCLUSION_MAX_TOKENS ?? 220);
+
+const mimeTypes = {
+  ".html": "text/html; charset=utf-8",
+  ".js": "application/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".svg": "image/svg+xml",
+  ".webp": "image/webp",
+  ".ico": "image/x-icon",
+  ".json": "application/json; charset=utf-8"
+};
 
 function parseBoolean(value, fallback) {
   if (value === undefined) return fallback;
@@ -73,6 +91,25 @@ function styleInstruction(style) {
   return styles[style] ?? "表达清晰，围绕议题推进。";
 }
 
+function roleName(name = "") {
+  for (const role of ["诸葛亮", "张飞", "刘备", "曹操", "关羽"]) {
+    if (name.includes(role)) return role;
+  }
+  return name;
+}
+
+function addressInstruction(person) {
+  const rules = {
+    张飞: "刘备=大哥，关羽=二哥，诸葛亮=军师，曹操=曹贼",
+    关羽: "刘备=大哥，张飞=三弟，诸葛亮=军师，曹操=曹贼",
+    诸葛亮: "刘备=主公，张飞=翼德，关羽=云长，曹操=曹贼",
+    刘备: "诸葛亮=军师，张飞=三弟，关羽=二弟，曹操=曹贼",
+    曹操: "诸葛亮=诸葛村夫，张飞=环眼贼，关羽=关将军，刘备=大耳贼"
+  };
+  const rule = rules[roleName(person.name)];
+  return rule ? `称呼规则：提到他人时必须用这些称呼：${rule}。` : "";
+}
+
 function buildMessages(payload) {
   const { person, snapshot, turnType, interruption, partialText } = payload;
   const phaseName = {
@@ -100,6 +137,7 @@ function buildMessages(payload) {
         `问：${clip(snapshot.question, 90)}`,
         `阶段：${phaseName}，轮次：${snapshot.round}`,
         `你：${person.name}，${person.gender}，${person.traits.join("、")}，${person.speechStyle}。${styleInstruction(person.speechStyle)}`,
+        addressInstruction(person),
         "近况：",
         recentTranscript(snapshot.transcript) || "暂无。",
         interruption
@@ -117,6 +155,44 @@ function writeText(res, status, text) {
     "cache-control": "no-store"
   });
   res.end(text);
+}
+
+function safeStaticPath(url = "/") {
+  const pathname = new URL(url, "http://localhost").pathname;
+  const candidate = pathname === "/" ? "/index.html" : pathname;
+  const fullPath = normalize(join(staticRoot, candidate));
+  return fullPath.startsWith(staticRoot) ? fullPath : "";
+}
+
+function serveStatic(req, res) {
+  if (!["GET", "HEAD"].includes(req.method ?? "")) {
+    writeText(res, 405, "Method not allowed.");
+    return;
+  }
+
+  let filePath = safeStaticPath(req.url);
+  if (!filePath || !existsSync(filePath) || statSync(filePath).isDirectory()) {
+    filePath = join(staticRoot, "index.html");
+  }
+
+  if (!existsSync(filePath)) {
+    writeText(res, 404, "Not found.");
+    return;
+  }
+
+  const ext = extname(filePath);
+  const isAsset = filePath.includes(`${join("dist", "assets")}`);
+  res.writeHead(200, {
+    "content-type": mimeTypes[ext] ?? "application/octet-stream",
+    "cache-control": isAsset ? "public, max-age=604800, immutable" : "no-cache"
+  });
+
+  if (req.method === "HEAD") {
+    res.end();
+    return;
+  }
+
+  createReadStream(filePath).pipe(res);
 }
 
 async function streamAi(req, res) {
@@ -225,7 +301,7 @@ createServer(async (req, res) => {
     return;
   }
 
-  writeText(res, 404, "Not found.");
-}).listen(port, "127.0.0.1", () => {
-  console.log(`AI proxy listening on http://127.0.0.1:${port}`);
+  serveStatic(req, res);
+}).listen(port, host, () => {
+  console.log(`Leaderless server listening on http://${host}:${port}`);
 });
