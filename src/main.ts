@@ -236,14 +236,20 @@ class PcmSpeechPlayer {
     this.flushText();
   }
 
-  async finishAndWait(): Promise<void> {
+  async finishAndWait(timeoutMs = 30000): Promise<void> {
     if (!voiceEnabled || !this.socket) return;
     this.finishRequested = true;
     this.flushFinish();
-    await Promise.race([this.donePromise, sleep(8000)]);
-    const remainingMs = this.context ? Math.max(0, (this.nextStartTime - this.context.currentTime) * 1000) : 0;
-    if (remainingMs > 0) {
-      await sleep(Math.min(remainingMs + 80, 5000));
+    let finished = false;
+    await Promise.race([
+      this.donePromise?.then(() => {
+        finished = true;
+      }),
+      sleep(timeoutMs)
+    ]);
+    const idle = await this.waitForPlaybackIdle(Math.min(12000, Math.max(3000, timeoutMs / 2)));
+    if (!finished || !idle) {
+      this.stop();
     }
   }
 
@@ -298,6 +304,16 @@ class PcmSpeechPlayer {
     } catch {
       // Ignore non-JSON control frames.
     }
+  }
+
+  private async waitForPlaybackIdle(timeoutMs: number): Promise<boolean> {
+    const startedAt = performance.now();
+    while (performance.now() - startedAt < timeoutMs) {
+      const queuedMs = this.context ? Math.max(0, (this.nextStartTime - this.context.currentTime) * 1000) : 0;
+      if (this.sources.size === 0 && queuedMs <= 30) return true;
+      await sleep(80);
+    }
+    return false;
   }
 
   private playPcm(data: ArrayBuffer): void {
@@ -597,12 +613,15 @@ async function revealSpeechText(
     if (interrupted) return true;
 
     const currentChar = activeText[index - 1];
+    const delay = voiceEnabled
+      ? { comma: 220, sentence: 420, normal: 150 }
+      : { comma: 100, sentence: 180, normal: 46 };
     if (/[，、,]/.test(currentChar)) {
-      await sleep(100);
+      await sleep(delay.comma);
     } else if (/[。！？；.!?;]/.test(currentChar)) {
-      await sleep(180);
+      await sleep(delay.sentence);
     } else {
-      await sleep(46);
+      await sleep(delay.normal);
     }
   }
 
@@ -778,7 +797,8 @@ async function speak(
     return { concluded: interruptResult.concluded || interruptionIntent.shouldConclude, speakerId: interruptionResultSpeakerId(interruptResult, interruptionIntent) };
   }
 
-  await speechPlayer.finishAndWait();
+  const audioWaitMs = Math.min(60000, Math.max(18000, activeText.length * 360 + 8000));
+  await speechPlayer.finishAndWait(audioWaitMs);
 
   addEntry({
     type: effectiveIntent.shouldConclude ? "conclusion" : effectiveType,
