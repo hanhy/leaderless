@@ -79,6 +79,21 @@ const roleAudioParams = {
   "阿杰": { speech_rate: 10, loudness_rate: 6, emotion: "neutral", emotion_scale: 2 }
 };
 
+const roleToneInstructions = {
+  "诸葛亮": "语气沉稳机敏，像军师拆局：先点破关键，再给可执行判断。",
+  "张飞": "语气急躁火爆，短句多，容易拍桌子式推进，但不要粗俗辱骂。",
+  "刘备": "语气温和包容，先安抚分歧，再把话题拉回共识。",
+  "曹操": "语气强势精明，带一点掌控感和试探感，直接权衡利弊。",
+  "关羽": "语气寡言稳重，重信义和原则，少说废话，判断要有分量。",
+  "唐僧": "语气耐心温和，像劝导众人，重视规则、善意和长远结果。",
+  "孙悟空": "语气灵动急切，反应快，敢打断，带一点不服输的锋芒。",
+  "猪八戒": "语气松弛直白，带一点小抱怨和现实盘算，但不能跑题。",
+  "沙僧": "语气踏实朴素，少争抢，多补充遗漏和落地执行。",
+  "李逵": "语气粗豪直冲，重义气，话短有冲劲，遇到绕弯会直接质疑。",
+  "林黛玉": "语气细腻敏感，表达含蓄但锋利，善于指出话里不妥和隐藏代价。",
+  "阿杰": "语气现代职场化，逻辑清楚，关注效率、风险、排期和责任边界。"
+};
+
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
   ".js": "application/javascript; charset=utf-8",
@@ -194,6 +209,11 @@ function addressInstruction(person) {
   return rule ? `称呼规则：提到他人时必须用这些称呼：${rule}。` : "";
 }
 
+function toneInstruction(person) {
+  const tone = roleToneInstructions[roleName(person.name)];
+  return tone ? `人物语气：${tone}` : "";
+}
+
 function buildMessages(payload) {
   const { person, snapshot, turnType, interruption, partialText } = payload;
   const phaseName = {
@@ -206,13 +226,13 @@ function buildMessages(payload) {
     turnType === "conclusion"
       ? "代表小组宣读阶段结论：共识、分歧、下一步。120字内。"
       : turnType === "interrupt"
-        ? "你在打断：先说“等一下、等等、抱歉我打断一下、不行、不对、这怎么行”等这类过渡词（你自己选择或者生成，不限于这几个词，符合日常场景和上下文语境），不需要先叫对方的称呼，再按你自己的意思推动结论。50字内。"
-        : "自然发言：回应上一位或当前议题，推进共识。90字内。";
+        ? "你在打断：先说“等一下、等等、抱歉我打断一下、不行、不对、这怎么行”等这类过渡词（你自己选择或者生成，不限于这几个词，符合日常场景和上下文语境），不需要先叫对方的称呼，再按你自己的意思推动结论。30字内。"
+        : "自然发言：回应上一位或当前议题，推进共识。30字内。";
 
   return [
     {
       role: "system",
-      content: "中文无领导小组角色。只输出发言本身，无角色名/Markdown/旁白。紧扣上下文，目标是阶段结论。跟别人说话的时候，只有1/4的概率会带上被打断人的称呼。让每个人的性格鲜明一点，口语化一些，不要每个人都做非常中肯的论证"
+      content: "中文无领导小组角色。只输出发言本身，无角色名/Markdown/旁白。紧扣上下文，目标是阶段结论。讨论涉及到的人物仅限于任务发布者和在场的几个人，不能涉及其他人。跟别人说话的时候，只有1/4的概率会带上被打断人的称呼。让每个人的性格鲜明一点，口语化一些，不要每个人都做非常中肯的论证"
     },
     {
       role: "user",
@@ -221,6 +241,7 @@ function buildMessages(payload) {
         `问：${clip(snapshot.question, 90)}`,
         `阶段：${phaseName}，轮次：${snapshot.round}`,
         `你：${person.name}，${person.gender}，${person.traits.join("、")}，${person.speechStyle}。${styleInstruction(person.speechStyle)}`,
+        toneInstruction(person),
         addressInstruction(person),
         "近况：",
         recentTranscript(snapshot.transcript) || "暂无。",
