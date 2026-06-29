@@ -20,13 +20,14 @@ function loadEnvFile() {
 
 const env = { ...loadEnvFile(), ...process.env };
 const apiPort = env.API_PORT ?? "8787";
+const vitePort = env.VITE_PORT ?? "5173";
 
 const processes = [
   spawn("node", ["server.mjs"], {
     env: { ...env, API_PORT: apiPort },
     stdio: "inherit"
   }),
-  spawn("npx", ["vite", "--host", "127.0.0.1"], {
+  spawn("npx", ["vite", "--host", "127.0.0.1", "--port", vitePort, "--strictPort"], {
     env: { ...env, API_PORT: apiPort },
     stdio: "inherit"
   })

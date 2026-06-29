@@ -58,7 +58,9 @@ const roleSpeakerFallbacks = {
   "唐僧": "zh_male_tangseng_uranus_bigtts",
   "孙悟空": "zh_male_sunwukong_uranus_bigtts",
   "猪八戒": "zh_male_zhubajie_uranus_bigtts",
-  "沙僧": "ICL_uranus_zh_male_younidashu_tob"
+  "沙僧": "ICL_uranus_zh_male_younidashu_tob",
+  "李逵": "zh_male_qingcang_uranus_bigtts",
+  "林黛玉": "ICL_uranus_zh_female_aomanjiaosheng_tob"
 };
 
 const roleAudioParams = {
@@ -70,7 +72,9 @@ const roleAudioParams = {
   "唐僧": { speech_rate: 8, loudness_rate: 6, emotion: "tender", emotion_scale: 3 },
   "孙悟空": { speech_rate: 28, loudness_rate: 16, emotion: "excited", emotion_scale: 4 },
   "猪八戒": { speech_rate: 18, loudness_rate: 12, emotion: "happy", emotion_scale: 4 },
-  "沙僧": { speech_rate: 6, loudness_rate: 8, emotion: "storytelling", emotion_scale: 2 }
+  "沙僧": { speech_rate: 6, loudness_rate: 8, emotion: "storytelling", emotion_scale: 2 },
+  "李逵": { speech_rate: 26, loudness_rate: 22, emotion: "angry", emotion_scale: 4 },
+  "林黛玉": { speech_rate: 2, loudness_rate: 2, emotion: "tender", emotion_scale: 3 }
 };
 
 const mimeTypes = {
@@ -139,7 +143,7 @@ function styleInstruction(style) {
 }
 
 function roleName(name = "") {
-  for (const role of ["诸葛亮", "张飞", "刘备", "曹操", "关羽", "唐僧", "孙悟空", "猪八戒", "沙僧"]) {
+  for (const role of ["诸葛亮", "张飞", "刘备", "曹操", "关羽", "唐僧", "孙悟空", "猪八戒", "沙僧", "李逵", "林黛玉"]) {
     if (name.includes(role)) return role;
   }
   return name;
@@ -155,7 +159,9 @@ function speakerEnvKey(role) {
     "唐僧": "VOLC_TTS_SPEAKER_TANG_SENG",
     "孙悟空": "VOLC_TTS_SPEAKER_SUN_WUKONG",
     "猪八戒": "VOLC_TTS_SPEAKER_ZHU_BAJIE",
-    "沙僧": "VOLC_TTS_SPEAKER_SHA_SENG"
+    "沙僧": "VOLC_TTS_SPEAKER_SHA_SENG",
+    "李逵": "VOLC_TTS_SPEAKER_LI_KUI",
+    "林黛玉": "VOLC_TTS_SPEAKER_LIN_DAIYU"
   };
   return keys[role];
 }
@@ -169,14 +175,16 @@ function speakerForName(name = "") {
 function addressInstruction(person) {
   const rules = {
     张飞: "刘备=大哥，关羽=二哥，诸葛亮=军师，曹操=曹贼",
-    关羽: "刘备=大哥，张飞=三弟，诸葛亮=军师，曹操=曹贼",
+    关羽: "刘备=大哥，张飞=三弟，诸葛亮=军师，曹操=曹贼，李逵=李兄，林黛玉=林姑娘，孙悟空=孙大圣",
     诸葛亮: "刘备=主公，张飞=翼德，关羽=云长，曹操=曹贼",
     刘备: "诸葛亮=军师，张飞=三弟，关羽=二弟，曹操=曹贼",
     曹操: "诸葛亮=诸葛村夫，张飞=环眼贼，关羽=关将军，刘备=大耳贼",
     唐僧: "孙悟空=悟空，猪八戒=八戒，沙僧=悟净",
-    孙悟空: "唐僧=师傅，猪八戒=八戒/呆子，沙僧=沙师弟",
+    孙悟空: "唐僧=师傅，猪八戒=八戒/呆子，沙僧=沙师弟，李逵=李逵兄弟，林黛玉=林姑娘，关羽=关将军",
     猪八戒: "唐僧=师傅，孙悟空=猴哥，沙僧=沙师弟",
-    沙僧: "唐僧=师傅，孙悟空=大师兄，猪八戒=二师兄"
+    沙僧: "唐僧=师傅，孙悟空=大师兄，猪八戒=二师兄",
+    李逵: "林黛玉=林姑娘，孙悟空=孙大圣，关羽=关二哥",
+    林黛玉: "李逵=李大哥，孙悟空=孙大圣，关羽=关将军"
   };
   const rule = rules[roleName(person.name)];
   return rule ? `称呼规则：提到他人时必须用这些称呼：${rule}。` : "";
@@ -194,13 +202,13 @@ function buildMessages(payload) {
     turnType === "conclusion"
       ? "代表小组宣读阶段结论：共识、分歧、下一步。120字内。"
       : turnType === "interrupt"
-        ? "你在打断：先接住对方已说内容，再补充/修正/反驳，推动结论。90字内。"
+        ? "你在打断：先说“等一下、等等、抱歉我打断一下、不行、不对、这怎么行”等这类过渡词（你自己选择或者生成，不限于这几个词，符合日常场景和上下文语境），不需要先叫对方的称呼，再按你自己的意思推动结论。50字内。"
         : "自然发言：回应上一位或当前议题，推进共识。90字内。";
 
   return [
     {
       role: "system",
-      content: "中文无领导小组角色。只输出发言本身，无角色名/Markdown/旁白。紧扣上下文，目标是阶段结论。"
+      content: "中文无领导小组角色。只输出发言本身，无角色名/Markdown/旁白。紧扣上下文，目标是阶段结论。跟别人说话的时候，只有1/4的概率会带上被打断人的称呼。让每个人的性格鲜明一点，口语化一些，不要每个人都做非常中肯的论证"
     },
     {
       role: "user",

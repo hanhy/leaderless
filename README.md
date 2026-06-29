@@ -35,6 +35,8 @@ VOLC_TTS_SPEAKER_TANG_SENG=zh_male_tangseng_uranus_bigtts
 VOLC_TTS_SPEAKER_SUN_WUKONG=zh_male_sunwukong_uranus_bigtts
 VOLC_TTS_SPEAKER_ZHU_BAJIE=zh_male_zhubajie_uranus_bigtts
 VOLC_TTS_SPEAKER_SHA_SENG=ICL_uranus_zh_male_younidashu_tob
+VOLC_TTS_SPEAKER_LI_KUI=zh_male_qingcang_uranus_bigtts
+VOLC_TTS_SPEAKER_LIN_DAIYU=zh_male_wennuanahu_uranus_bigtts
 ```
 
 启动：
@@ -54,4 +56,4 @@ npm run dev
 
 ## 场景
 
-左上角可以切换场景：`圆桌三国` 使用诸葛亮、张飞、刘备、曹操、关羽；`圆桌西游` 使用唐僧、孙悟空、猪八戒、沙僧。切换场景会重置当前讨论记录和人物配置。
+左上角可以切换场景：`圆桌三国` 使用诸葛亮、张飞、刘备、曹操、关羽；`圆桌西游` 使用唐僧、孙悟空、猪八戒、沙僧；`名大会` 使用李逵、林黛玉、孙悟空、关羽。切换场景会重置当前讨论记录和人物配置。
