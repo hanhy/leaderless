@@ -60,7 +60,8 @@ const roleSpeakerFallbacks = {
   "猪八戒": "zh_male_zhubajie_uranus_bigtts",
   "沙僧": "ICL_uranus_zh_male_younidashu_tob",
   "李逵": "zh_male_qingcang_uranus_bigtts",
-  "林黛玉": "ICL_uranus_zh_female_aomanjiaosheng_tob"
+  "林黛玉": "ICL_uranus_zh_female_aomanjiaosheng_tob",
+  "阿杰": "zh_male_wennuanahu_uranus_bigtts"
 };
 
 const roleAudioParams = {
@@ -74,7 +75,8 @@ const roleAudioParams = {
   "猪八戒": { speech_rate: 18, loudness_rate: 12, emotion: "happy", emotion_scale: 4 },
   "沙僧": { speech_rate: 6, loudness_rate: 8, emotion: "storytelling", emotion_scale: 2 },
   "李逵": { speech_rate: 26, loudness_rate: 22, emotion: "angry", emotion_scale: 4 },
-  "林黛玉": { speech_rate: 2, loudness_rate: 2, emotion: "tender", emotion_scale: 3 }
+  "林黛玉": { speech_rate: 2, loudness_rate: 2, emotion: "tender", emotion_scale: 3 },
+  "阿杰": { speech_rate: 10, loudness_rate: 6, emotion: "neutral", emotion_scale: 2 }
 };
 
 const mimeTypes = {
@@ -143,7 +145,7 @@ function styleInstruction(style) {
 }
 
 function roleName(name = "") {
-  for (const role of ["诸葛亮", "张飞", "刘备", "曹操", "关羽", "唐僧", "孙悟空", "猪八戒", "沙僧", "李逵", "林黛玉"]) {
+  for (const role of ["诸葛亮", "张飞", "刘备", "曹操", "关羽", "唐僧", "孙悟空", "猪八戒", "沙僧", "李逵", "林黛玉", "阿杰"]) {
     if (name.includes(role)) return role;
   }
   return name;
@@ -161,7 +163,8 @@ function speakerEnvKey(role) {
     "猪八戒": "VOLC_TTS_SPEAKER_ZHU_BAJIE",
     "沙僧": "VOLC_TTS_SPEAKER_SHA_SENG",
     "李逵": "VOLC_TTS_SPEAKER_LI_KUI",
-    "林黛玉": "VOLC_TTS_SPEAKER_LIN_DAIYU"
+    "林黛玉": "VOLC_TTS_SPEAKER_LIN_DAIYU",
+    "阿杰": "VOLC_TTS_SPEAKER_A_JIE"
   };
   return keys[role];
 }
@@ -175,7 +178,7 @@ function speakerForName(name = "") {
 function addressInstruction(person) {
   const rules = {
     张飞: "刘备=大哥，关羽=二哥，诸葛亮=军师，曹操=曹贼",
-    关羽: "刘备=大哥，张飞=三弟，诸葛亮=军师，曹操=曹贼，李逵=李兄，林黛玉=林姑娘，孙悟空=孙大圣",
+    关羽: "刘备=大哥，张飞=三弟，诸葛亮=军师，曹操=曹贼，李逵=李兄，林黛玉=林姑娘，孙悟空=孙大圣，阿杰=阿杰",
     诸葛亮: "刘备=主公，张飞=翼德，关羽=云长，曹操=曹贼",
     刘备: "诸葛亮=军师，张飞=三弟，关羽=二弟，曹操=曹贼",
     曹操: "诸葛亮=诸葛村夫，张飞=环眼贼，关羽=关将军，刘备=大耳贼",
@@ -183,8 +186,9 @@ function addressInstruction(person) {
     孙悟空: "唐僧=师傅，猪八戒=八戒/呆子，沙僧=沙师弟，李逵=李逵兄弟，林黛玉=林姑娘，关羽=关将军",
     猪八戒: "唐僧=师傅，孙悟空=猴哥，沙僧=沙师弟",
     沙僧: "唐僧=师傅，孙悟空=大师兄，猪八戒=二师兄",
-    李逵: "林黛玉=林姑娘，孙悟空=孙大圣，关羽=关二哥",
-    林黛玉: "李逵=李大哥，孙悟空=孙大圣，关羽=关将军"
+    李逵: "林黛玉=林姑娘，孙悟空=孙大圣，关羽=关二哥，阿杰=阿杰兄弟",
+    林黛玉: "李逵=李大哥，孙悟空=孙大圣，关羽=关将军，阿杰=阿杰先生",
+    阿杰: "李逵=李逵大哥，林黛玉=林姑娘，关羽=关将军"
   };
   const rule = rules[roleName(person.name)];
   return rule ? `称呼规则：提到他人时必须用这些称呼：${rule}。` : "";
