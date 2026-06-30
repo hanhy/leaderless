@@ -54,13 +54,13 @@ const roleSpeakerFallbacks = {
   "张飞": "zh_male_qingcang_uranus_bigtts",
   "刘备": "zh_male_wennuanahu_uranus_bigtts",
   "曹操": "zh_male_aojiaobazong_uranus_bigtts",
-  "关羽": "zh_male_gaolengchenwen_uranus_bigtts",
+  "关羽": "ICL_uranus_zh_male_chengshuzongcai_tob",
   "唐僧": "zh_male_tangseng_uranus_bigtts",
   "孙悟空": "zh_male_sunwukong_uranus_bigtts",
   "猪八戒": "zh_male_zhubajie_uranus_bigtts",
   "沙僧": "ICL_uranus_zh_male_younidashu_tob",
   "李逵": "zh_male_qingcang_uranus_bigtts",
-  "林黛玉": "ICL_uranus_zh_female_aomanjiaosheng_tob",
+  "林黛玉": "zh_female_vv_uranus_bigtts",
   "阿杰": "zh_male_wennuanahu_uranus_bigtts"
 };
 
@@ -202,7 +202,7 @@ function addressInstruction(person) {
     猪八戒: "唐僧=师傅，孙悟空=猴哥，沙僧=沙师弟",
     沙僧: "唐僧=师傅，孙悟空=大师兄，猪八戒=二师兄",
     李逵: "林黛玉=林姑娘，孙悟空=孙大圣，关羽=关二哥，阿杰=阿杰兄弟",
-    林黛玉: "李逵=李大哥，孙悟空=孙大圣，关羽=关将军，阿杰=阿杰先生",
+    林黛玉: "李逵=李大哥，孙悟空=孙大圣，关羽=关将军，阿杰=阿杰",
     阿杰: "李逵=李逵大哥，林黛玉=林姑娘，关羽=关将军"
   };
   const rule = rules[roleName(person.name)];
@@ -232,7 +232,7 @@ function buildMessages(payload) {
   return [
     {
       role: "system",
-      content: "中文无领导小组角色。只输出发言本身，无角色名/Markdown/旁白。紧扣上下文，目标是阶段结论。讨论涉及到的人物仅限于任务发布者和在场的几个人，不能涉及其他人。跟别人说话的时候，只有1/4的概率会带上被打断人的称呼。让每个人的性格鲜明一点，口语化一些，不要每个人都做非常中肯的论证"
+      content: "中文无领导小组角色。只输出发言本身，无角色名/Markdown/旁白。紧扣上下文，目标是阶段结论。讨论涉及到的人物仅限于任务发布者和在场的几个人，不能涉及其他人。跟别人说话的时候，只有1/4的概率会带上被打断人的称呼，且称呼里不要带过于陌生的“比如先生”等。让每个人的性格鲜明一点，要非常口语化，不许文绉绉，不许说“言之有理”等词，不要每个人都做非常中肯的论证"
     },
     {
       role: "user",
